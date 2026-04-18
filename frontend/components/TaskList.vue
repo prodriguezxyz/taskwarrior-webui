@@ -90,6 +90,18 @@
 
 					<v-spacer />
 
+					<div class="ma-2" style="max-width: 320px; flex: 0 1 320px;">
+						<v-text-field
+							v-model="search"
+							prepend-inner-icon="mdi-magnify"
+							label="Search"
+							clearable
+							hide-details
+							dense
+							single-line
+						/>
+					</div>
+
 					<!-- Global Actions -->
 					<div class="ma-2">
 						<v-btn
@@ -210,7 +222,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, computed, reactive, ref, ComputedRef, Ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
 import TaskDialog from '../components/TaskDialog.vue';
@@ -322,21 +334,39 @@ export default defineComponent({
 
 		const showColumnDialog = ref(false);
 
+		const search = ref('');
+
+		watch(search, () => {
+			selected.value = [];
+		});
+
+		const matchesSearch = (task: Task, q: string) => {
+			if (!q) return true;
+			const needle = q.toLowerCase();
+			if (task.description?.toLowerCase().includes(needle)) return true;
+			if (task.project?.toLowerCase().includes(needle)) return true;
+			if (task.tags?.some(t => t.toLowerCase().includes(needle))) return true;
+			if (task.annotations?.some(a => a.description?.toLowerCase().includes(needle))) return true;
+			return false;
+		};
+
 		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
 		for (const status of allStatus) {
-			tempTasks[status] = computed((): Task[] => props.tasks?.filter(task => {
-				if (status === "waiting" || status === "pending") {
-					const waiting = (task.wait && !expiredDate(task.wait))
-						|| (task.scheduled && futureDate(task.scheduled));
-					return task.status === "pending" && (status === "pending" ? !waiting : waiting);
-				}
-				else if (status === "pending") {
-					return task.status === "pending" && !(task.wait && !expiredDate(task.wait));
-				}
-				else {
-					return task.status === status;
-				}
-			}));
+			tempTasks[status] = computed((): Task[] => {
+				const q = search.value || '';
+				return props.tasks?.filter(task => {
+					let passStatus: boolean;
+					if (status === "waiting" || status === "pending") {
+						const waiting = (task.wait && !expiredDate(task.wait))
+							|| (task.scheduled && futureDate(task.scheduled));
+						passStatus = task.status === "pending" && (status === "pending" ? !waiting : !!waiting);
+					}
+					else {
+						passStatus = task.status === status;
+					}
+					return passStatus && matchesSearch(task, q);
+				});
+			});
 		}
 		const classifiedTasks = reactive(tempTasks);
 
@@ -459,6 +489,7 @@ export default defineComponent({
 			showTaskDialog,
 			showConfirmationDialog,
 			showColumnDialog,
+			search,
 			confirmation,
 			displayDate,
 			rowClass,
