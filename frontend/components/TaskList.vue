@@ -27,7 +27,7 @@
 					</v-icon>
 					{{ st }}
 					<v-badge
-						v-if="st === 'pending' && classifiedTasks[st].value && classifiedTasks[st].value.length"
+						v-if="(st === 'pending' || st === 'today') && classifiedTasks[st].value && classifiedTasks[st].value.length"
 						:content="classifiedTasks[st].value.length"
 						:color="st === status ? 'primary' : 'grey'"
 						inline
@@ -53,7 +53,7 @@
 					<!-- Batch actions -->
 					<div class="pl-2 pt-2" v-show="selected.length">
 						<v-btn
-							v-show="status === 'pending'"
+							v-show="status === 'pending' || status === 'today'"
 							class="ma-1 green"
 							fab
 							small
@@ -169,7 +169,7 @@
 
 			<template v-slot:item.actions="{ item }">
 				<v-icon
-					v-show="status === 'pending'"
+					v-show="status === 'pending' || status === 'today'"
 					size="20px"
 					class="ml-2"
 					@click="completeTasks([item])"
@@ -290,9 +290,10 @@ export default defineComponent({
 		const store = useStore<typeof accessorType>();
 		const selected = ref([] as Task[]);
 
-		const status = ref('pending');
-		const allStatus = ['pending', 'waiting', 'completed', 'deleted', 'recurring'];
+		const status = ref('today');
+		const allStatus = ['today', 'pending', 'waiting', 'completed', 'deleted', 'recurring'];
 		const statusIcons: { [st: string]: string } = {
+			today: 'mdi-calendar-today',
 			pending: 'mdi-clock-outline',
 			waiting: 'mdi-pause',
 			completed: 'mdi-check',
@@ -324,19 +325,30 @@ export default defineComponent({
 
 		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
 		for (const status of allStatus) {
-			tempTasks[status] = computed((): Task[] => props.tasks?.filter(task => {
-				if (status === "waiting" || status === "pending") {
-					const waiting = (task.wait && !expiredDate(task.wait))
-						|| (task.scheduled && futureDate(task.scheduled));
-					return task.status === "pending" && (status === "pending" ? !waiting : waiting);
-				}
-				else if (status === "pending") {
-					return task.status === "pending" && !(task.wait && !expiredDate(task.wait));
-				}
-				else {
-					return task.status === status;
-				}
-			}));
+			tempTasks[status] = computed((): Task[] => {
+				const endOfToday = status === "today" ? moment().endOf('day') : null;
+				return props.tasks?.filter(task => {
+					if (status === "today") {
+						const waiting = (task.wait && !expiredDate(task.wait))
+							|| (task.scheduled && futureDate(task.scheduled));
+						return task.status === "pending"
+							&& !waiting
+							&& task.due !== undefined
+							&& moment(task.due).isSameOrBefore(endOfToday!);
+					}
+					else if (status === "waiting" || status === "pending") {
+						const waiting = (task.wait && !expiredDate(task.wait))
+							|| (task.scheduled && futureDate(task.scheduled));
+						return task.status === "pending" && (status === "pending" ? !waiting : waiting);
+					}
+					else if (status === "pending") {
+						return task.status === "pending" && !(task.wait && !expiredDate(task.wait));
+					}
+					else {
+						return task.status === status;
+					}
+				});
+			});
 		}
 		const classifiedTasks = reactive(tempTasks);
 
