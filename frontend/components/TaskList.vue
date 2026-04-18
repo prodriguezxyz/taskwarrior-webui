@@ -8,7 +8,7 @@
 		/>
 		<TaskDialog v-model="showTaskDialog" :task="currentTask || undefined" />
 		<ColumnDialog v-model="showColumnDialog" :active-columns="headers"/>
-		<v-row class="px-4 pt-4">
+		<v-row class="px-4 pt-4 align-center">
 			<v-btn-toggle v-model="status" mandatory background-color="rgba(0, 0, 0, 0)">
 			<v-row class="pa-3">
 				<v-btn
@@ -35,6 +35,19 @@
 				</v-btn>
 			</v-row>
 		</v-btn-toggle>
+		<v-spacer />
+		<v-text-field
+			v-model="search"
+			prepend-inner-icon="mdi-magnify"
+			placeholder="Buscar tareas…"
+			outlined
+			dense
+			clearable
+			hide-details
+			single-line
+			style="max-width: 320px"
+			class="mr-4"
+		/>
   </v-row>
 
   <v-row class="px-4 pt-4">
@@ -89,18 +102,6 @@
 					</div>
 
 					<v-spacer />
-
-					<div class="ma-2" style="max-width: 320px; flex: 0 1 320px;">
-						<v-text-field
-							v-model="search"
-							prepend-inner-icon="mdi-magnify"
-							label="Search"
-							clearable
-							hide-details
-							dense
-							single-line
-						/>
-					</div>
 
 					<!-- Global Actions -->
 					<div class="ma-2">
