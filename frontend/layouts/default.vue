@@ -29,6 +29,15 @@
 				Taskwarrior WebUI
 			</v-toolbar-title>
 			<v-spacer />
+			<v-select
+				v-if="profiles.length > 1"
+				:items="profiles.map(p => p.name)"
+				v-model="currentProfile"
+				dense
+				hide-details
+				style="max-width: 160px"
+				class="mr-4"
+			/>
 			<v-icon class="mr-4" size="28px" @click="dark = !dark" title="Theme">
 				{{ dark ? 'mdi-brightness-4' : 'mdi-brightness-7' }}
 			</v-icon>
@@ -53,16 +62,24 @@
 <script lang="ts">
 import { defineComponent, useContext, useStore, computed, onErrorCaptured, ref, watch } from '@nuxtjs/composition-api';
 import SettingsDialog from '../components/SettingsDialog.vue';
-import { accessorType  } from "../store";
+import { accessorType } from '../store';
 
 export default defineComponent({
 	setup(_props, ctx) {
 		const context = useContext();
 		const store = useStore<typeof accessorType>();
-		store.dispatch('fetchSettings');
 		store.dispatch('fetchHiddenColumns');
 
 		context.$vuetify.theme.dark = store.state.settings.dark;
+
+		const profiles = computed(() => store.state.profiles);
+		const currentProfile = computed({
+			get: () => store.state.settings.profile,
+			set: val => {
+				store.dispatch('updateSettings', { ...store.state.settings, profile: val });
+				store.dispatch('fetchTasks');
+			}
+		});
 
 		const dark = computed({
 			get: () => context.$vuetify.theme.dark,
@@ -105,6 +122,8 @@ export default defineComponent({
 			snackbar,
 			notification,
 			settingsDialog,
+			profiles,
+			currentProfile,
 
 			SettingsDialog
 		};

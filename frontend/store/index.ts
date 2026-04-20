@@ -12,9 +12,12 @@ export const state = () => ({
 	settings: {
 		dark: false,
 		autoRefresh: '5', // in minutes
-		autoSync: '0' // in minutes
+		autoSync: '0', // in minutes
+		profile: ''
 	},
-	hiddenColumns: [] as string[]
+	hiddenColumns: [] as string[],
+	profiles: [] as Array<{ name: string }>,
+	defaultProfile: ''
 });
 
 export type RootState = ReturnType<typeof state>;
@@ -36,7 +39,12 @@ export const mutations: MutationTree<RootState> = {
 	},
 
 	setHiddenColumns(state, hiddenColumns) {
-		state.hiddenColumns = hiddenColumns
+		state.hiddenColumns = hiddenColumns;
+	},
+
+	setProfiles(state, payload: { profiles: Array<{ name: string }>, default: string }) {
+		state.profiles = payload.profiles;
+		state.defaultProfile = payload.default;
 	},
 
 	setNotification(state, notification) {
@@ -52,10 +60,9 @@ export const mutations: MutationTree<RootState> = {
 
 export const actions: ActionTree<RootState, RootState> = {
 	fetchSettings(context) {
-		const settings = localStorage.getItem('settings');
-		if (settings) {
-			context.commit('setSettings', JSON.parse(settings));
-		}
+		const raw = localStorage.getItem('settings');
+		const saved = raw ? JSON.parse(raw) : {};
+		context.commit('setSettings', { ...context.state.settings, ...saved });
 	},
 
 	updateSettings(context, settings) {
@@ -73,6 +80,17 @@ export const actions: ActionTree<RootState, RootState> = {
 	updateHiddenColumns(context, columns) {
 		context.commit('setHiddenColumns', columns);
 		localStorage.setItem('hiddenColumns', JSON.stringify(columns));
+	},
+
+	async fetchProfiles(context) {
+		const payload: { profiles: Array<{ name: string }>, default: string }
+			= await this.$axios.$get('/api/profiles');
+		context.commit('setProfiles', payload);
+		const settings = context.state.settings;
+		const valid = payload.profiles.some(p => p.name === settings.profile);
+		if (!valid) {
+			context.dispatch('updateSettings', { ...settings, profile: payload.default });
+		}
 	},
 
 	async fetchTasks(context) {

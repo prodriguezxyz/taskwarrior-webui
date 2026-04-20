@@ -68,8 +68,40 @@ docker run -d -p 8080:80 --name taskwarrior-webui \
 The following environment variables may be set:
  * `TASKRC` - the location of the `.taskrc` file, `/.taskrc` by default when run in _production_ mode
  * `TASKDATA` - the location of the `.task` directory, `/.task` by default when run in _production_ mode
+ * `PROFILES_CONFIG` - path to a JSON file declaring multiple task datasets (see below), `/profiles.json` by default
 
 Remember to mount your files to **the corresponding locations** when you set `TASKRC` or `TASKDATA` to a different value.
+
+### Multiple profiles
+
+To switch between several `.taskrc`/`.task` pairs from the UI, mount a JSON file
+with one entry per profile:
+
+```json
+{
+  "profiles": [
+    { "name": "Personal", "taskrc": "/profiles/personal/.taskrc", "taskdata": "/profiles/personal/.task" },
+    { "name": "Work",     "taskrc": "/profiles/work/.taskrc",     "taskdata": "/profiles/work/.task" }
+  ]
+}
+```
+
+Then mount the file and the referenced data directories into the container:
+
+```sh
+docker run -d -p 8080:80 --name taskwarrior-webui \
+    -v $PWD/profiles.json:/profiles.json \
+    -v $HOME/.taskrc:/profiles/personal/.taskrc \
+    -v $HOME/.task:/profiles/personal/.task \
+    -v $PWD/work/.taskrc:/profiles/work/.taskrc \
+    -v $PWD/work/.task:/profiles/work/.task \
+    dcsunset/taskwarrior-webui:3
+```
+
+A profile selector appears in the top bar whenever two or more profiles are
+defined. If `PROFILES_CONFIG` points to a missing file, the UI falls back to a
+single default profile using `TASKRC` and `TASKDATA` — so existing deployments
+keep working without changes.
 
 ### Manually deploy
 

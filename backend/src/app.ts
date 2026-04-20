@@ -6,6 +6,7 @@ import * as qs from 'koa-qs';
 
 import tasksRouter from './tasks';
 import syncRouter from './sync';
+import { profilesRouter, getProfile, hasProfile } from './profiles';
 import { TaskError } from 'taskwarrior-lib';
 
 const app = new Koa();
@@ -27,9 +28,27 @@ app.use(async (ctx, next) => {
 	}
 });
 
+app.use(async (ctx, next) => {
+	// /profiles is the discovery endpoint; it is profile-agnostic and must
+	// tolerate stale X-Profile headers from clients whose localStorage still
+	// references a profile the admin has since removed.
+	if (ctx.path.startsWith('/profiles')) {
+		await next();
+		return;
+	}
+	const raw = ctx.request.headers['x-profile'];
+	const name = typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+	if (name && !hasProfile(name)) {
+		ctx.throw(400, `Unknown profile: ${name}`);
+	}
+	ctx.state.taskwarrior = getProfile(name);
+	await next();
+});
+
 const router = new Router();
 router.use('/tasks', tasksRouter.routes());
 router.use('/sync', syncRouter.routes());
+router.use('/profiles', profilesRouter.routes());
 
 app.use(router.routes());
 app.use(router.allowedMethods());
