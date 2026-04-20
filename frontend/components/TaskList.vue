@@ -40,7 +40,7 @@
 			v-if="!searchOpen"
 			icon
 			class="mr-4"
-			title="Buscar (/)"
+			title="Buscar (/ o Ctrl+K)"
 			@click="openSearch"
 		>
 			<v-icon>mdi-magnify</v-icon>
@@ -374,9 +374,13 @@ export default defineComponent({
 		};
 
 		const onGlobalKeydown = (e: KeyboardEvent) => {
-			if (e.key !== '/') return;
-			const t = e.target as HTMLElement | null;
-			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+			const isSlash = e.key === '/';
+			if (!isCtrlK && !isSlash) return;
+			if (isSlash) {
+				const t = e.target as HTMLElement | null;
+				if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+			}
 			e.preventDefault();
 			openSearch();
 		};
