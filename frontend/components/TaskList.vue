@@ -36,7 +36,18 @@
 			</v-row>
 		</v-btn-toggle>
 		<v-spacer />
+		<v-btn
+			v-if="!searchOpen"
+			icon
+			class="mr-4"
+			title="Buscar (/)"
+			@click="openSearch"
+		>
+			<v-icon>mdi-magnify</v-icon>
+		</v-btn>
 		<v-text-field
+			v-else
+			ref="searchInput"
 			v-model="search"
 			prepend-inner-icon="mdi-magnify"
 			placeholder="Buscar tareas…"
@@ -47,6 +58,8 @@
 			single-line
 			style="max-width: 320px"
 			class="mr-4"
+			@blur="handleSearchBlur"
+			@keydown.esc="closeSearch"
 		/>
   </v-row>
 
@@ -223,7 +236,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, reactive, ref, watch, nextTick, onMounted, onBeforeUnmount, ComputedRef, Ref } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
 import TaskDialog from '../components/TaskDialog.vue';
@@ -336,10 +349,40 @@ export default defineComponent({
 		const showColumnDialog = ref(false);
 
 		const search = ref('');
+		const searchOpen = ref(false);
+		const searchInput: Ref<any> = ref(null);
 
 		watch(search, () => {
 			selected.value = [];
 		});
+
+		const openSearch = async () => {
+			searchOpen.value = true;
+			await nextTick();
+			searchInput.value?.focus();
+		};
+
+		const closeSearch = () => {
+			search.value = '';
+			searchOpen.value = false;
+		};
+
+		const handleSearchBlur = () => {
+			if (!search.value) {
+				searchOpen.value = false;
+			}
+		};
+
+		const onGlobalKeydown = (e: KeyboardEvent) => {
+			if (e.key !== '/') return;
+			const t = e.target as HTMLElement | null;
+			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+			e.preventDefault();
+			openSearch();
+		};
+
+		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
+		onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
 
 		const matchesSearch = (task: Task, q: string) => {
 			if (!q) return true;
@@ -491,6 +534,11 @@ export default defineComponent({
 			showConfirmationDialog,
 			showColumnDialog,
 			search,
+			searchOpen,
+			searchInput,
+			openSearch,
+			closeSearch,
+			handleSearchBlur,
 			confirmation,
 			displayDate,
 			rowClass,
