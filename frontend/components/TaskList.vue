@@ -338,8 +338,10 @@ export default defineComponent({
 		const store = useStore<typeof accessorType>();
 		const selected = ref([] as Task[]);
 
-		const status = ref('today');
-		const allStatus = ['today', 'pending', 'waiting', 'completed', 'deleted', 'recurring'];
+		const view = computed(() => store.state.view);
+		const status = ref(view.value === 'today' ? 'today' : 'pending');
+		const allStatus = ['pending', 'waiting', 'completed', 'deleted', 'recurring'];
+		const classifiedStatuses = ['today', ...allStatus];
 		const statusIcons: { [st: string]: string } = {
 			today: 'mdi-calendar-today',
 			pending: 'mdi-clock-outline',
@@ -398,6 +400,16 @@ export default defineComponent({
 			selected.value = [];
 		});
 
+		watch(view, v => {
+			if (v === 'today') {
+				status.value = 'today';
+			}
+			else if (status.value === 'today') {
+				status.value = 'pending';
+			}
+			selected.value = [];
+		});
+
 		const toggleTag = (tag: string) => {
 			const idx = tagFilter.value.indexOf(tag);
 			if (idx === -1) tagFilter.value = [...tagFilter.value, tag];
@@ -425,7 +437,7 @@ export default defineComponent({
 		const isOverdue = (task: Task) => !!task.due && moment(task.due).isBefore(moment());
 
 		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
-		for (const status of allStatus) {
+		for (const status of classifiedStatuses) {
 			tempTasks[status] = computed((): Task[] => {
 				const endOfToday = status === 'today' ? moment().endOf('day') : null;
 				const filtered = props.tasks?.filter(task => {
@@ -446,7 +458,10 @@ export default defineComponent({
 					else {
 						passStatus = task.status === status;
 					}
-					return passStatus && matchesFilters(task);
+					if (!passStatus) return false;
+					// Inbox scope: when no project filter and not the today bucket, only unprojected
+					if (!projectFilter.value && status !== 'today' && task.project) return false;
+					return matchesFilters(task);
 				}) || [];
 
 				if (status === 'today' || status === 'pending') {
@@ -565,6 +580,9 @@ export default defineComponent({
 		};
 
 		const selectStatus = (st: string) => {
+			if (view.value === 'today') {
+				store.commit('setView', 'all');
+			}
 			if (st !== status.value) {
 				selected.value = [];
 				status.value = st;
@@ -606,6 +624,7 @@ export default defineComponent({
 			statusLabels,
 
 			projectFilter,
+			view,
 			currentItems,
 			tagFilter,
 			priorityFilter,

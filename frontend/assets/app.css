@@ -523,6 +523,19 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-accent) !important;
 }
 
+/* Today entry — accent in orange on idle; standard active treatment */
+.tw-sidebar__icon--today { color: var(--tw-st-today) !important; }
+.tw-sidebar__count--today { color: var(--tw-st-today); }
+.tw-sidebar__item--today.tw-sidebar__item--active,
+.tw-sidebar__item--today.tw-sidebar__item--active:hover {
+	background: var(--tw-st-today-soft);
+	color: var(--tw-st-today);
+}
+.tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__icon--today,
+.tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__count--today {
+	color: var(--tw-st-today) !important;
+}
+
 /* Prominent "Add task" entry (top of sidebar) */
 .tw-sidebar__item--primary,
 .tw-sidebar__item--primary:hover {

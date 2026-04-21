@@ -3,7 +3,7 @@
 		<div class="tw-page">
 			<header class="tw-page__header">
 				<h1 class="tw-page__title">
-					{{ projectFilter || 'All tasks' }}
+					{{ pageTitle }}
 					<span class="tw-page__count">{{ pendingCount }}</span>
 				</h1>
 				<div v-if="projectFilter" class="tw-page__meta">
@@ -18,6 +18,7 @@
 
 <script lang="ts">
 import { defineComponent, computed, watch, ComputedRef, useStore, useContext } from '@nuxtjs/composition-api';
+import moment from 'moment';
 import TaskList from '../components/TaskList.vue';
 import { Task } from 'taskwarrior-lib';
 import { accessorType } from '../store';
@@ -63,12 +64,29 @@ export default defineComponent({
 		const tasks: ComputedRef<Task[]> = computed(() => store.state.tasks);
 
 		const projectFilter = computed(() => store.state.projectFilter);
+		const view = computed(() => store.state.view);
+
+		const pageTitle = computed(() => {
+			if (view.value === 'today') return 'Today';
+			if (projectFilter.value) return projectFilter.value;
+			return 'Inbox';
+		});
 
 		const pendingCount = computed(() => {
 			const base = store.state.tasks.filter((t: Task) => t.status === 'pending');
-			return projectFilter.value
-				? base.filter((t: Task) => t.project === projectFilter.value).length
-				: base.length;
+			if (view.value === 'today') {
+				const endOfToday = moment().endOf('day');
+				const now = moment();
+				return base.filter((t: Task) => {
+					const waiting = (t.wait && moment(t.wait).isAfter(now))
+						|| (t.scheduled && moment(t.scheduled).isAfter(now));
+					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
+				}).length;
+			}
+			if (projectFilter.value) {
+				return base.filter((t: Task) => t.project === projectFilter.value).length;
+			}
+			return base.filter((t: Task) => !t.project).length;
 		});
 
 		const progress = computed(() => {
@@ -85,6 +103,8 @@ export default defineComponent({
 			TaskList,
 			tasks,
 			projectFilter,
+			view,
+			pageTitle,
 			pendingCount,
 			progress
 		};

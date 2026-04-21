@@ -94,12 +94,23 @@
 				<button
 					type="button"
 					class="tw-sidebar__item"
-					:class="{ 'tw-sidebar__item--active': !projectFilter }"
-					@click="setProject(null)"
+					:class="{ 'tw-sidebar__item--active': view === 'all' && !projectFilter }"
+					@click="selectInbox"
 				>
 					<v-icon size="16" class="tw-sidebar__icon">mdi-inbox-outline</v-icon>
-					<span class="tw-sidebar__label">All tasks</span>
+					<span class="tw-sidebar__label">Inbox</span>
 					<span class="tw-sidebar__count">{{ totalPending }}</span>
+				</button>
+
+				<button
+					type="button"
+					class="tw-sidebar__item tw-sidebar__item--today"
+					:class="{ 'tw-sidebar__item--active': view === 'today' }"
+					@click="selectToday"
+				>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today">mdi-calendar-today-outline</v-icon>
+					<span class="tw-sidebar__label">Today</span>
+					<span v-if="todayCount > 0" class="tw-sidebar__count tw-sidebar__count--today">{{ todayCount }}</span>
 				</button>
 
 				<div v-if="projectList.length" class="tw-sidebar__section">
@@ -109,7 +120,7 @@
 						:key="p.name"
 						type="button"
 						class="tw-sidebar__item"
-						:class="{ 'tw-sidebar__item--active': projectFilter === p.name }"
+						:class="{ 'tw-sidebar__item--active': view === 'all' && projectFilter === p.name }"
 						@click="setProject(p.name)"
 					>
 						<v-icon size="16" class="tw-sidebar__icon">mdi-folder-outline</v-icon>
@@ -128,6 +139,7 @@
 
 <script lang="ts">
 import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref } from '@nuxtjs/composition-api';
+import moment from 'moment';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 import SearchPalette from '../components/SearchPalette.vue';
@@ -151,12 +163,25 @@ export default defineComponent({
 		});
 
 		const projectFilter = computed(() => store.state.projectFilter);
+		const view = computed(() => store.state.view);
 
 		const pendingTasks = computed(() =>
 			store.state.tasks.filter((t: any) => t.status === 'pending')
 		);
 
-		const totalPending = computed(() => pendingTasks.value.length);
+		const totalPending = computed(() =>
+			pendingTasks.value.filter((t: any) => !t.project).length
+		);
+
+		const todayCount = computed(() => {
+			const endOfToday = moment().endOf('day');
+			const now = moment();
+			return pendingTasks.value.filter((t: any) => {
+				const waiting = (t.wait && moment(t.wait).isAfter(now))
+					|| (t.scheduled && moment(t.scheduled).isAfter(now));
+				return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
+			}).length;
+		});
 
 		const projectList = computed(() => {
 			const counts = new Map<string, number>();
@@ -174,6 +199,17 @@ export default defineComponent({
 
 		const setProject = (name: string | null) => {
 			store.commit('setProjectFilter', name);
+			store.commit('setView', 'all');
+		};
+
+		const selectInbox = () => {
+			store.commit('setProjectFilter', null);
+			store.commit('setView', 'all');
+		};
+
+		const selectToday = () => {
+			store.commit('setProjectFilter', null);
+			store.commit('setView', 'today');
 		};
 
 		const taskDialogOpen = computed(() => store.state.taskDialog.open);
@@ -244,9 +280,13 @@ export default defineComponent({
 			profiles,
 			currentProfile,
 			projectFilter,
+			view,
 			totalPending,
+			todayCount,
 			projectList,
 			setProject,
+			selectInbox,
+			selectToday,
 
 			taskDialogOpen,
 			taskDialogTask,

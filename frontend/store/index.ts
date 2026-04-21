@@ -19,6 +19,7 @@ export const state = () => ({
 	profiles: [] as Array<{ name: string }>,
 	defaultProfile: '',
 	projectFilter: null as string | null,
+	view: 'all' as 'all' | 'today',
 	searchOpen: false,
 	taskDialog: {
 		open: false,
@@ -65,6 +66,10 @@ export const mutations: MutationTree<RootState> = {
 
 	setProjectFilter(state, value: string | null) {
 		state.projectFilter = value;
+	},
+
+	setView(state, value: 'all' | 'today') {
+		state.view = value;
 	},
 
 	setSearchOpen(state, value: boolean) {
