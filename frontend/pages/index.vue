@@ -1,52 +1,26 @@
 <template>
-	<div class="px-md-6 px-lg-12">
-		<v-row class="px-4 pt-4">
-			<div class="headline d-flex align-center">{{ mode }}</div>
-			<template v-if="mode === 'Projects'">
-				<v-icon class="mx-2">
-					mdi-chevron-right
-				</v-icon>
-
-				<v-select
-					class="mb-3"
-					:items="projects"
-					label="Project"
-					v-model="project"
-					style="max-width: 120px"
-					hide-details
-				/>
-				<div class="ml-6 d-flex align-center">
-					<v-progress-circular
-						:size="54"
-						:width="5"
-						:value="progress"
-						color="primary"
-					>
-						{{ progress }}%
-					</v-progress-circular>
+	<div>
+		<div class="tw-page">
+			<header class="tw-page__header">
+				<h1 class="tw-page__title">
+					{{ projectFilter || 'All tasks' }}
+					<span class="tw-page__count">{{ pendingCount }}</span>
+				</h1>
+				<div v-if="projectFilter" class="tw-page__meta">
+					{{ progress }}% complete
 				</div>
-			</template>
-
-			<v-spacer />
-			<v-select
-				class="mb-3 ml-3"
-				:items="allModes"
-				label="Display Mode"
-				v-model="mode"
-				style="max-width: 120px"
-				hide-details
-			/>
-		</v-row>
+			</header>
+		</div>
 
 		<TaskList :tasks="tasks" />
 	</div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, ComputedRef, useStore, useContext } from '@nuxtjs/composition-api';
+import { defineComponent, computed, watch, ComputedRef, useStore, useContext } from '@nuxtjs/composition-api';
 import TaskList from '../components/TaskList.vue';
 import { Task } from 'taskwarrior-lib';
-import { accessorType  } from "../store";
+import { accessorType } from '../store';
 
 export default defineComponent({
 	setup() {
@@ -54,7 +28,6 @@ export default defineComponent({
 		const context = useContext();
 		store.dispatch('fetchTasks');
 
-		// Auto Refresh
 		let refreshInterval: NodeJS.Timeout | null = null;
 		const setAutoRefresh = () => {
 			if (refreshInterval)
@@ -68,7 +41,6 @@ export default defineComponent({
 		};
 		setAutoRefresh();
 
-		// Auto Sync
 		let syncInterval: NodeJS.Timeout | null = null;
 		const setAutoSync = () => {
 			if (syncInterval)
@@ -82,57 +54,38 @@ export default defineComponent({
 		};
 		setAutoSync();
 
-		// Update settings
 		watch(() => store.state.settings, () => {
 			setAutoSync();
 			setAutoRefresh();
 			context.$vuetify.theme.dark = store.state.settings.dark;
 		});
 
-		const mode = ref('Tasks');
-		const allModes = ['Tasks', 'Projects'];
+		const tasks: ComputedRef<Task[]> = computed(() => store.state.tasks);
 
-		const project = ref('');
-		const projects: ComputedRef<string[]> = computed(() => store.getters.projects);
-		watch(projects, () => {
-			if (projects.value.includes(project.value))
-				return;
-			if (projects.value.length)
-				project.value = projects.value[0];
-			else
-				project.value = '';
-		});
+		const projectFilter = computed(() => store.state.projectFilter);
 
-		const tasks: ComputedRef<Task[]> = computed(() => {
-			if (mode.value === 'Tasks')
-				return store.state.tasks;
-
-			if (project.value)
-				return store.state.tasks.filter(
-					(task: Task) => task.project === project.value
-				);
-
-			return [];
+		const pendingCount = computed(() => {
+			const base = store.state.tasks.filter((t: Task) => t.status === 'pending');
+			return projectFilter.value
+				? base.filter((t: Task) => t.project === projectFilter.value).length
+				: base.length;
 		});
 
 		const progress = computed(() => {
-			if (mode.value === 'Projects' && project.value) {
-				const completed = tasks.value.reduce((acc: number, task) => task.status === 'completed' ? acc + 1 : acc, 0);
-				const pending = tasks.value.reduce((acc: number, task) => task.status === 'pending' ? acc + 1 : acc, 0);
-				return completed + pending === 0
-					? 100
-					: Math.ceil(100 * completed / (completed + pending));
-			}
-			return 0;
+			if (!projectFilter.value) return 0;
+			const proj = projectFilter.value;
+			const rel = store.state.tasks.filter((t: Task) => t.project === proj);
+			const completed = rel.reduce((acc: number, t: Task) => t.status === 'completed' ? acc + 1 : acc, 0);
+			const pending = rel.reduce((acc: number, t: Task) => t.status === 'pending' ? acc + 1 : acc, 0);
+			const total = completed + pending;
+			return total === 0 ? 100 : Math.round(100 * completed / total);
 		});
 
 		return {
-			mode,
-			allModes,
 			TaskList,
 			tasks,
-			projects,
-			project,
+			projectFilter,
+			pendingCount,
 			progress
 		};
 	}

@@ -7,232 +7,296 @@
 			@yes="confirmation.handler"
 		/>
 		<TaskDialog v-model="showTaskDialog" :task="currentTask || undefined" />
-		<ColumnDialog v-model="showColumnDialog" :active-columns="headers"/>
-		<v-row class="px-4 pt-4 align-center">
-			<v-btn-toggle v-model="status" mandatory background-color="rgba(0, 0, 0, 0)">
-			<v-row class="pa-3">
-				<v-btn
+		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
+
+		<div class="tw-toolbar">
+			<nav v-if="!isSearching" class="tw-tabs" role="tablist">
+				<button
 					v-for="st in allStatus"
 					:key="st"
-					:value="st"
-					:color="st === status ? 'primary' : undefined"
-					text
-					@click="st !== status && (selected = [])"
+					type="button"
+					role="tab"
+					:aria-selected="st === status"
+					:data-status="st"
+					class="tw-tab"
+					:class="{ 'tw-tab--active': st === status }"
+					@click="selectStatus(st)"
 				>
-					<v-icon
-						class="mr-1"
-						:color="st === status ? 'primary' : undefined"
-					>
+					<v-icon size="15" class="tw-tab__icon">
 						{{ statusIcons[st] }}
 					</v-icon>
-					{{ st }}
-					<v-badge
-						v-if="(st === 'pending' || st === 'today') && classifiedTasks[st].value && classifiedTasks[st].value.length"
-						:content="classifiedTasks[st].value.length"
-						:color="st === status ? 'primary' : 'grey'"
-						inline
-					/>
-				</v-btn>
-			</v-row>
-		</v-btn-toggle>
-		<v-spacer />
-		<v-btn
-			v-if="!searchOpen"
-			icon
-			class="mr-4"
-			title="Buscar (/ o Ctrl+K)"
-			@click="openSearch"
-		>
-			<v-icon>mdi-magnify</v-icon>
-		</v-btn>
-		<v-text-field
-			v-else
-			ref="searchInput"
-			v-model="search"
-			prepend-inner-icon="mdi-magnify"
-			placeholder="Buscar tareas…"
-			outlined
-			dense
-			clearable
-			hide-details
-			single-line
-			style="max-width: 320px"
-			class="mr-4"
-			@blur="handleSearchBlur"
-			@keydown.esc="closeSearch"
-		/>
-  </v-row>
+					<span class="tw-tab__label">{{ statusLabels[st] }}</span>
+					<span
+						v-if="tabCount(st) > 0"
+						class="tw-tab__count"
+					>{{ tabCount(st) }}</span>
+				</button>
+			</nav>
 
-  <v-row class="px-4 pt-4">
-		<v-data-table
-			:items="classifiedTasks[status]"
-			:headers="filteredHeaders"
-			show-select
-			item-key="uuid"
-			:item-class="rowClass"
-			v-model="selected"
-			class="elevation-1"
-			style="width: 100%"
-		>
-			<template v-slot:top>
-				<v-row class="px-4">
-					<!-- Batch actions -->
-					<div class="pl-2 pt-2" v-show="selected.length">
-						<v-btn
-							v-show="status === 'pending' || status === 'today'"
-							class="ma-1 green"
-							fab
-							small
-							dark
-							title="Done"
-							@click="completeTasks(selected)"
-						>
-							<v-icon>mdi-check</v-icon>
-						</v-btn>
-						<v-btn
-							v-show="status === 'completed' || status === 'deleted'"
-							class="ma-1"
-							color="primary"
-							fab
-							dark
-							small
-							title="Restore"
-							@click="restoreTasks(selected)"
-						>
-							<v-icon>mdi-restore</v-icon>
-						</v-btn>
-						<v-btn
-							v-show="status !== 'deleted'"
-							class="ma-1 red"
-							fab
-							dark
-							small
-							title="Delete"
-							@click="deleteTasks(selected)"
-						>
-							<v-icon>mdi-delete</v-icon>
-						</v-btn>
-					</div>
+			<div v-if="isSearching" class="tw-search-banner">
+				<v-icon size="15" class="tw-search-banner__icon">mdi-magnify</v-icon>
+				<span>Searching all tasks · <strong>{{ currentItems.length }}</strong> {{ currentItems.length === 1 ? 'result' : 'results' }}</span>
+			</div>
 
-					<v-spacer />
+			<div class="tw-toolbar__spacer" />
 
-					<!-- Global Actions -->
-					<div class="ma-2">
-						<v-btn
-							class="green ml-1"
-							fab
-							dark
-							title="Refresh"
-							@click="refresh"
-						>
-							<v-icon>mdi-refresh</v-icon>
-						</v-btn>
+			<div class="tw-toolbar__actions">
+				<v-text-field
+					v-if="searchOpen"
+					ref="searchInput"
+					v-model="search"
+					prepend-inner-icon="mdi-magnify"
+					placeholder="Search…"
+					outlined
+					dense
+					clearable
+					hide-details
+					single-line
+					class="tw-search-input"
+					@blur="handleSearchBlur"
+					@keydown.esc="closeSearch"
+				/>
+				<button
+					v-else
+					type="button"
+					class="tw-action tw-action--ghost"
+					title="Search (/ or Ctrl+K)"
+					@click="openSearch"
+				>
+					<v-icon size="18">mdi-magnify</v-icon>
+				</button>
 
-						<v-btn
-								v-if="showSyncBtn"
-								class="green ml-1"
-								fab
-								dark
-								title="Sync Tasks"
-								@click="syncTasks"
-							>
-								<v-icon>mdi-sync</v-icon>
-						</v-btn>
+				<button
+					type="button"
+					class="tw-action tw-action--ghost"
+					:class="{ 'tw-action--on': showFilters || hasActiveFilters }"
+					title="Filters"
+					@click="showFilters = !showFilters"
+				>
+					<v-icon size="18">mdi-filter-variant</v-icon>
+				</button>
 
-						<v-btn
-							class="primary ml-1"
-							fab
-							dark
-							title="New task"
-							@click="newTask"
-						>
-							<v-icon>mdi-plus</v-icon>
-						</v-btn>
-						<v-btn
-							class="primary ml-1"
-							fab
-							dark
-							small
-							title="Configure Columns"
-							@click="showColumnDialog = true"
-						>
-							<v-icon>mdi-cogs</v-icon>
-						</v-btn>
-					</div>
-				</v-row>
-			</template>
+				<button
+					type="button"
+					class="tw-action tw-action--ghost"
+					title="Refresh"
+					@click="refresh"
+				>
+					<v-icon size="18">mdi-refresh</v-icon>
+				</button>
 
-			<template v-slot:item.description="{ item }">
-				<span v-html="linkify(item.description)" />
-			</template>
+				<button
+					v-if="showSyncBtn"
+					type="button"
+					class="tw-action tw-action--ghost"
+					title="Sync"
+					@click="syncTasks"
+				>
+					<v-icon size="18">mdi-sync</v-icon>
+				</button>
 
-			<template v-if="status === 'waiting'" v-slot:item.wait="{ item }">
-				{{ displayDate(item.wait) }}
-			</template>
-			<template v-slot:item.scheduled="{ item }">
-				{{ displayDate(item.scheduled) }}
-			</template>
-			<template v-slot:item.due="{ item }">
-				{{ displayDate(item.due) }}
-			</template>
-			<template v-slot:item.until="{ item }">
-				{{ displayDate(item.until) }}
-			</template>
+				<button
+					type="button"
+					class="tw-action tw-action--ghost"
+					title="Configure columns"
+					@click="showColumnDialog = true"
+				>
+					<v-icon size="18">mdi-view-column-outline</v-icon>
+				</button>
 
-			<template v-slot:item.tags="{ item }">
-				<v-chip
-					v-for="tag in item.tags"
+				<button
+					type="button"
+					class="tw-btn tw-btn--primary"
+					title="New task"
+					@click="newTask"
+				>
+					<v-icon size="16" left>mdi-plus</v-icon>
+					<span>New task</span>
+				</button>
+			</div>
+		</div>
+
+		<div v-if="showFilters" class="tw-filterbar">
+			<div v-if="availableTags.length" class="tw-filterbar__group">
+				<span class="tw-filterbar__label">Tags</span>
+				<button
+					v-for="tag in availableTags"
 					:key="tag"
-					small
+					type="button"
+					class="tw-chip-filter"
+					:class="{ 'tw-chip-filter--active': tagFilter.includes(tag) }"
+					@click="toggleTag(tag)"
 				>
 					{{ tag }}
-				</v-chip>
-			</template>
+				</button>
+			</div>
+			<div class="tw-filterbar__group">
+				<span class="tw-filterbar__label">Priority</span>
+				<button
+					v-for="p in ['H','M','L']"
+					:key="p"
+					type="button"
+					class="tw-chip-filter"
+					:class="{ 'tw-chip-filter--active': priorityFilter === p }"
+					@click="togglePriority(p)"
+				>
+					{{ p }}
+				</button>
+			</div>
+			<div class="tw-filterbar__spacer" />
+			<button
+				v-if="hasActiveFilters"
+				type="button"
+				class="tw-chip-filter tw-chip-filter--clear"
+				@click="clearFilters"
+			>
+				Clear all
+			</button>
+		</div>
 
-			<template v-slot:item.urgency="{ item }">
-				{{ item.urgency }}
-			</template>
+		<div class="tw-table-wrap">
+			<div v-if="selected.length" class="tw-selbar">
+				<span class="tw-selbar__count">
+					<strong>{{ selected.length }}</strong> selected
+				</span>
+				<button
+					type="button"
+					class="tw-selbar__clear"
+					@click="selected = []"
+				>
+					Clear
+				</button>
 
-			<template v-slot:item.actions="{ item }">
-				<v-icon
-					v-show="status === 'pending' || status === 'today'"
-					size="20px"
-					class="ml-2"
-					@click="completeTasks([item])"
-					title="Done"
+				<div class="tw-selbar__spacer" />
+
+				<button
+					v-if="status === 'pending' || status === 'today'"
+					type="button"
+					class="tw-btn tw-btn--ghost"
+					@click="completeTasks(selected)"
 				>
-					mdi-check
-				</v-icon>
-				<v-icon
-					v-show="status === 'completed' || status === 'deleted'"
-					size="20px"
-					class="ml-2"
-					@click="restoreTasks([item])"
-					title="Restore"
+					<v-icon size="16" left>mdi-check</v-icon>
+					Complete
+				</button>
+				<button
+					v-if="status === 'completed' || status === 'deleted'"
+					type="button"
+					class="tw-btn tw-btn--ghost"
+					@click="restoreTasks(selected)"
 				>
-					mdi-restore
-				</v-icon>
-				<v-icon
-					class="ml-2"
-					size="20px"
-					@click="editTask(item)"
-					title="Edit"
+					<v-icon size="16" left>mdi-restore</v-icon>
+					Restore
+				</button>
+				<button
+					v-if="status !== 'deleted'"
+					type="button"
+					class="tw-btn tw-btn--ghost tw-btn--danger"
+					@click="deleteTasks(selected)"
 				>
-					mdi-pencil
-				</v-icon>
-				<v-icon
-					v-show="status !== 'deleted'"
-					class="ml-2"
-					size="20px"
-					@click="deleteTasks([item])"
-					title="Delete"
-				>
-					mdi-delete
-				</v-icon>
-			</template>
-		</v-data-table>
-  </v-row>
-  </div>
+					<v-icon size="16" left>mdi-delete-outline</v-icon>
+					Delete
+				</button>
+			</div>
+
+			<v-data-table
+				:items="currentItems"
+				:headers="filteredHeaders"
+				show-select
+				item-key="uuid"
+				:item-class="rowClass"
+				:group-by="groupBy"
+				v-model="selected"
+				class="tw-table"
+				style="width: 100%"
+			>
+				<template v-slot:group.header="{ group, items, isOpen, toggle, headers: hdrs }">
+					<tr class="v-row-group__header tw-group-row">
+						<td :colspan="hdrs.length" class="tw-group-header">
+							<button
+								type="button"
+								class="tw-group-header__toggle"
+								:class="{ 'tw-group-header__toggle--overdue': group === 'Overdue' }"
+								@click="toggle"
+							>
+								<v-icon size="14">{{ isOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+								<span>{{ group }}</span>
+								<span class="tw-group-header__count">{{ items.length }}</span>
+							</button>
+						</td>
+					</tr>
+				</template>
+
+				<template v-slot:item.description="{ item }">
+					<span v-html="linkify(item.description)" />
+				</template>
+
+				<template v-if="status === 'waiting'" v-slot:item.wait="{ item }">
+					{{ displayDate(item.wait) }}
+				</template>
+				<template v-slot:item.scheduled="{ item }">
+					{{ displayDate(item.scheduled) }}
+				</template>
+				<template v-slot:item.due="{ item }">
+					{{ displayDate(item.due) }}
+				</template>
+				<template v-slot:item.until="{ item }">
+					{{ displayDate(item.until) }}
+				</template>
+
+				<template v-slot:item.tags="{ item }">
+					<v-chip
+						v-for="tag in item.tags"
+						:key="tag"
+						small
+					>
+						{{ tag }}
+					</v-chip>
+				</template>
+
+				<template v-slot:item.urgency="{ item }">
+					{{ item.urgency }}
+				</template>
+
+				<template v-slot:item.actions="{ item }">
+					<v-icon
+						v-show="status === 'pending' || status === 'today'"
+						size="20px"
+						class="ml-2"
+						@click="completeTasks([item])"
+						title="Done"
+					>
+						mdi-check
+					</v-icon>
+					<v-icon
+						v-show="status === 'completed' || status === 'deleted'"
+						size="20px"
+						class="ml-2"
+						@click="restoreTasks([item])"
+						title="Restore"
+					>
+						mdi-restore
+					</v-icon>
+					<v-icon
+						class="ml-2"
+						size="20px"
+						@click="editTask(item)"
+						title="Edit"
+					>
+						mdi-pencil
+					</v-icon>
+					<v-icon
+						v-show="status !== 'deleted'"
+						class="ml-2"
+						size="20px"
+						@click="deleteTasks([item])"
+						title="Delete"
+					>
+						mdi-delete
+					</v-icon>
+				</template>
+			</v-data-table>
+		</div>
+	</div>
 </template>
 
 <script lang="ts">
@@ -245,7 +309,7 @@ import ColumnDialog from '../components/ColumnDialog.vue';
 import moment from 'moment';
 import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
-import { accessorType  } from "../store";
+import { accessorType } from '../store';
 
 function displayDate(str?: string) {
 	if (!str)
@@ -323,8 +387,16 @@ export default defineComponent({
 			pending: 'mdi-clock-outline',
 			waiting: 'mdi-pause',
 			completed: 'mdi-check',
-			deleted: 'mdi-delete',
+			deleted: 'mdi-delete-outline',
 			recurring: 'mdi-restart'
+		};
+		const statusLabels: { [st: string]: string } = {
+			today: 'Today',
+			pending: 'Pending',
+			waiting: 'Waiting',
+			completed: 'Completed',
+			deleted: 'Deleted',
+			recurring: 'Recurring'
 		};
 		const headers = computed(() => [
 			{ text: 'Project', value: 'project' },
@@ -343,9 +415,9 @@ export default defineComponent({
 			{ text: 'Actions', value: 'actions', sortable: false }
 		]);
 
-		const filteredHeaders = computed(()=>
-			headers.value.filter((v)=> !store.state.hiddenColumns.includes(v.value))
-		)
+		const filteredHeaders = computed(() =>
+			headers.value.filter((v) => !store.state.hiddenColumns.includes(v.value))
+		);
 
 		const showColumnDialog = ref(false);
 
@@ -360,7 +432,7 @@ export default defineComponent({
 		const openSearch = async () => {
 			searchOpen.value = true;
 			await nextTick();
-			searchInput.value?.focus();
+			searchInput.value?.focus?.();
 		};
 
 		const closeSearch = () => {
@@ -399,34 +471,118 @@ export default defineComponent({
 			return false;
 		};
 
+		const projectFilter = computed(() => store.state.projectFilter);
+		const tagFilter = ref<string[]>([]);
+		const priorityFilter: Ref<string | null> = ref(null);
+		const showFilters = ref(false);
+
+		const isSearching = computed(() => !!search.value);
+
+		const availableTags = computed(() => {
+			const set = new Set<string>();
+			props.tasks?.forEach(t => t.tags?.forEach(tg => set.add(tg)));
+			return Array.from(set).sort();
+		});
+
+		const hasActiveFilters = computed(() =>
+			tagFilter.value.length > 0 || priorityFilter.value !== null
+		);
+
+		watch([projectFilter, tagFilter, priorityFilter], () => {
+			selected.value = [];
+		});
+
+		const toggleTag = (tag: string) => {
+			const idx = tagFilter.value.indexOf(tag);
+			if (idx === -1) tagFilter.value = [...tagFilter.value, tag];
+			else tagFilter.value = tagFilter.value.filter(t => t !== tag);
+		};
+
+		const togglePriority = (p: string) => {
+			priorityFilter.value = priorityFilter.value === p ? null : p;
+		};
+
+		const clearFilters = () => {
+			tagFilter.value = [];
+			priorityFilter.value = null;
+		};
+
+		const matchesFilters = (task: Task) => {
+			if (projectFilter.value && task.project !== projectFilter.value) return false;
+			if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
+			if (tagFilter.value.length) {
+				if (!task.tags || !tagFilter.value.every(t => task.tags!.includes(t))) return false;
+			}
+			return true;
+		};
+
+		const isOverdue = (task: Task) => !!task.due && moment(task.due).isBefore(moment());
+
 		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
 		for (const status of allStatus) {
 			tempTasks[status] = computed((): Task[] => {
 				const q = search.value || '';
-				const endOfToday = status === "today" ? moment().endOf('day') : null;
-				return props.tasks?.filter(task => {
+				const endOfToday = status === 'today' ? moment().endOf('day') : null;
+				const filtered = props.tasks?.filter(task => {
 					let passStatus: boolean;
-					if (status === "today") {
+					if (status === 'today') {
 						const waiting = (task.wait && !expiredDate(task.wait))
 							|| (task.scheduled && futureDate(task.scheduled));
-						passStatus = task.status === "pending"
+						passStatus = task.status === 'pending'
 							&& !waiting
 							&& task.due !== undefined
 							&& moment(task.due).isSameOrBefore(endOfToday!);
 					}
-					else if (status === "waiting" || status === "pending") {
+					else if (status === 'waiting' || status === 'pending') {
 						const waiting = (task.wait && !expiredDate(task.wait))
 							|| (task.scheduled && futureDate(task.scheduled));
-						passStatus = task.status === "pending" && (status === "pending" ? !waiting : !!waiting);
+						passStatus = task.status === 'pending' && (status === 'pending' ? !waiting : !!waiting);
 					}
 					else {
 						passStatus = task.status === status;
 					}
-					return passStatus && matchesSearch(task, q);
-				});
+					return passStatus && matchesSearch(task, q) && matchesFilters(task);
+				}) || [];
+
+				if (status === 'today' || status === 'pending') {
+					const todayGroup = status === 'today' ? 'Today' : 'Upcoming';
+					return filtered.map(t => ({
+						...t,
+						_group: isOverdue(t) ? 'Overdue' : todayGroup
+					})) as Task[];
+				}
+				return filtered;
 			});
 		}
 		const classifiedTasks = reactive(tempTasks);
+
+		const searchResults = computed((): Task[] => {
+			const q = search.value || '';
+			if (!q) return [];
+			return props.tasks?.filter(task => {
+				if (!matchesSearch(task, q)) return false;
+				if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
+				if (tagFilter.value.length) {
+					if (!task.tags || !tagFilter.value.every(t => task.tags!.includes(t))) return false;
+				}
+				return true;
+			}) || [];
+		});
+
+		const currentItems = computed((): Task[] => {
+			if (isSearching.value) return searchResults.value;
+			const bucket: any = (classifiedTasks as any)[status.value];
+			return Array.isArray(bucket) ? bucket : (bucket?.value || []);
+		});
+
+		const groupBy = computed(() => {
+			if (isSearching.value) return '';
+			if (status.value !== 'today' && status.value !== 'pending') return '';
+			const bucket: any = (classifiedTasks as any)[status.value];
+			const arr: any[] = Array.isArray(bucket) ? bucket : (bucket?.value || []);
+			const groups = new Set(arr.map(t => t._group));
+			return groups.size > 1 ? '_group' : '';
+		});
 
 		const refresh = () => {
 			store.dispatch('fetchTasks');
@@ -453,7 +609,8 @@ export default defineComponent({
 					color: 'success',
 					text: 'Successfully synced tasks.'
 				});
-			} catch (error) {
+			}
+			catch (error) {
 				store.commit('setNotification', {
 					color: 'error',
 					text: 'Failed to sync tasks.'
@@ -519,11 +676,26 @@ export default defineComponent({
 		const rowClass = (item: Task) => {
 			if (item.mask)
 				return 'recur-task';
-			else if (status.value !== 'completed' && urgentDate(item.due))
+			else if (item.status !== 'completed' && urgentDate(item.due))
 				return 'urgent-task';
-			else if (status.value !== 'completed' && expiredDate(item.due))
+			else if (item.status !== 'completed' && expiredDate(item.due))
 				return 'expired-task';
 			return undefined;
+		};
+
+		const selectStatus = (st: string) => {
+			if (st !== status.value) {
+				selected.value = [];
+				status.value = st;
+			}
+		};
+
+		const tabCount = (st: string): number => {
+			const bucket: any = (classifiedTasks as any)[st];
+			if (!bucket) return 0;
+			// reactive wraps ComputedRef; handle both shapes
+			const arr = Array.isArray(bucket) ? bucket : bucket.value;
+			return arr ? arr.length : 0;
 		};
 
 		return {
@@ -532,6 +704,7 @@ export default defineComponent({
 			headers,
 			filteredHeaders,
 			classifiedTasks,
+			groupBy,
 			status,
 			allStatus,
 			statusIcons,
@@ -556,25 +729,26 @@ export default defineComponent({
 			confirmation,
 			displayDate,
 			rowClass,
+			selectStatus,
+			tabCount,
+			statusLabels,
+
+			projectFilter,
+			isSearching,
+			currentItems,
+			tagFilter,
+			priorityFilter,
+			availableTags,
+			showFilters,
+			hasActiveFilters,
+			toggleTag,
+			togglePriority,
+			clearFilters,
 
 			TaskDialog,
 			ConfirmationDialog,
-			ColumnDialog,
+			ColumnDialog
 		};
 	}
 });
 </script>
-
-<style>
-.v-application tr.recur-task {
-  background-color: #2196F333;
-}
-
-.v-application tr.urgent-task {
-  background-color: #F4433633;
-}
-
-.v-application tr.expired-task {
-  background-color: #79554844;
-}
-</style>

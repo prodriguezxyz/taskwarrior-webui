@@ -17,7 +17,8 @@ export const state = () => ({
 	},
 	hiddenColumns: [] as string[],
 	profiles: [] as Array<{ name: string }>,
-	defaultProfile: ''
+	defaultProfile: '',
+	projectFilter: null as string | null
 });
 
 export type RootState = ReturnType<typeof state>;
@@ -55,6 +56,10 @@ export const mutations: MutationTree<RootState> = {
 
 	setSnackbar(state, value) {
 		state.snackbar = value;
+	},
+
+	setProjectFilter(state, value: string | null) {
+		state.projectFilter = value;
 	}
 };
 

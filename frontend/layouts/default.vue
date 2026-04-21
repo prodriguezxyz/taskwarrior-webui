@@ -21,46 +21,88 @@
 			</template>
 		</v-snackbar>
 
-		<v-app-bar height="54px" fixed app>
-			<v-icon class="mr-2" color="blue">
-				mdi-sticker-check-outline
-			</v-icon>
-			<v-toolbar-title>
-				Taskwarrior WebUI
-			</v-toolbar-title>
+		<v-app-bar height="52px" fixed app flat>
+			<div class="tw-wordmark">
+				<span class="tw-wordmark__dot" />
+				<span>Taskwarrior</span>
+			</div>
+
 			<v-spacer />
+
 			<v-select
 				v-if="profiles.length > 1"
 				:items="profiles.map(p => p.name)"
 				v-model="currentProfile"
 				dense
 				hide-details
+				solo
+				flat
+				class="tw-profile-select mr-2"
 				style="max-width: 160px"
-				class="mr-4"
 			/>
-			<v-icon class="mr-4" size="28px" @click="dark = !dark" title="Theme">
-				{{ dark ? 'mdi-brightness-4' : 'mdi-brightness-7' }}
-			</v-icon>
-			<v-icon
-				class="mr-2"
-				size="28px"
+
+			<div
+				class="tw-icon-btn"
+				role="button"
+				tabindex="0"
+				:title="dark ? 'Light theme' : 'Dark theme'"
+				@click="dark = !dark"
+				@keydown.enter="dark = !dark"
+			>
+				<v-icon size="18">{{ dark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+			</div>
+
+			<div
+				class="tw-icon-btn"
+				role="button"
+				tabindex="0"
 				title="Settings"
 				@click="settingsDialog = true"
+				@keydown.enter="settingsDialog = true"
 			>
-				mdi-cog
-			</v-icon>
+				<v-icon size="18">mdi-cog-outline</v-icon>
+			</div>
 		</v-app-bar>
 
+		<v-navigation-drawer app permanent width="240" class="tw-sidebar" :mini-variant="false">
+			<nav class="tw-sidebar__nav">
+				<button
+					type="button"
+					class="tw-sidebar__item"
+					:class="{ 'tw-sidebar__item--active': !projectFilter }"
+					@click="setProject(null)"
+				>
+					<v-icon size="16" class="tw-sidebar__icon">mdi-inbox-outline</v-icon>
+					<span class="tw-sidebar__label">All tasks</span>
+					<span class="tw-sidebar__count">{{ totalPending }}</span>
+				</button>
+
+				<div v-if="projectList.length" class="tw-sidebar__section">
+					<span class="tw-sidebar__heading">Projects</span>
+					<button
+						v-for="p in projectList"
+						:key="p.name"
+						type="button"
+						class="tw-sidebar__item"
+						:class="{ 'tw-sidebar__item--active': projectFilter === p.name }"
+						@click="setProject(p.name)"
+					>
+						<v-icon size="16" class="tw-sidebar__icon">mdi-folder-outline</v-icon>
+						<span class="tw-sidebar__label">{{ p.name }}</span>
+						<span v-if="p.count > 0" class="tw-sidebar__count">{{ p.count }}</span>
+					</button>
+				</div>
+			</nav>
+		</v-navigation-drawer>
+
 		<v-main>
-			<v-container fluid>
-				<nuxt />
-			</v-container>
+			<nuxt />
 		</v-main>
 	</v-app>
 </template>
 
 <script lang="ts">
-import { defineComponent, useContext, useStore, computed, onErrorCaptured, ref, watch } from '@nuxtjs/composition-api';
+import { defineComponent, useContext, useStore, computed, onErrorCaptured, ref } from '@nuxtjs/composition-api';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import { accessorType } from '../store';
 
@@ -81,6 +123,32 @@ export default defineComponent({
 			}
 		});
 
+		const projectFilter = computed(() => store.state.projectFilter);
+
+		const pendingTasks = computed(() =>
+			store.state.tasks.filter((t: any) => t.status === 'pending')
+		);
+
+		const totalPending = computed(() => pendingTasks.value.length);
+
+		const projectList = computed(() => {
+			const counts = new Map<string, number>();
+			for (const t of pendingTasks.value) {
+				if (t.project) counts.set(t.project, (counts.get(t.project) || 0) + 1);
+			}
+			// Include projects that have no pending tasks too (from any task)
+			for (const t of store.state.tasks) {
+				if (t.project && !counts.has(t.project)) counts.set(t.project, 0);
+			}
+			return Array.from(counts.entries())
+				.map(([name, count]) => ({ name, count }))
+				.sort((a, b) => a.name.localeCompare(b.name));
+		});
+
+		const setProject = (name: string | null) => {
+			store.commit('setProjectFilter', name);
+		};
+
 		const dark = computed({
 			get: () => context.$vuetify.theme.dark,
 			set: val => {
@@ -97,7 +165,6 @@ export default defineComponent({
 		});
 
 		onErrorCaptured((err: any) => {
-			// axios error
 			let notification: any;
 			if (err?.response) {
 				const { status, data } = err.response!;
@@ -124,6 +191,10 @@ export default defineComponent({
 			settingsDialog,
 			profiles,
 			currentProfile,
+			projectFilter,
+			totalPending,
+			projectList,
+			setProject,
 
 			SettingsDialog
 		};

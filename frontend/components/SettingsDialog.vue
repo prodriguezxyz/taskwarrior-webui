@@ -83,11 +83,11 @@
 
 <script lang="ts">
 import { watch, defineComponent, useStore, computed, ref, reactive } from '@nuxtjs/composition-api';
-import { accessorType  } from "../store";
+import { accessorType } from '../store';
 
 export default defineComponent({
 	props: {
-		value: Boolean,
+		value: Boolean
 	},
 
 	setup(props, ctx) {
