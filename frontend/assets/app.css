@@ -250,6 +250,10 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-st-today) !important;
 }
 
+.v-icon.tw-page__icon--tag {
+	color: var(--tw-st-recurring) !important;
+}
+
 .tw-page__spacer { flex: 1; }
 
 .tw-page__meta {
@@ -607,6 +611,215 @@ body { font-family: var(--tw-font); }
 	height: 1px;
 	background: var(--tw-border);
 	margin: 10px 2px;
+}
+
+/* Tags sidebar entry — active treatment in cyan */
+.tw-sidebar__icon--tag { color: var(--tw-st-recurring) !important; }
+.tw-sidebar__item--tag.tw-sidebar__item--active,
+.tw-sidebar__item--tag.tw-sidebar__item--active:hover {
+	background: var(--tw-st-recurring-soft);
+	color: var(--tw-st-recurring);
+}
+.tw-sidebar__item--tag.tw-sidebar__item--active .tw-sidebar__icon--tag,
+.tw-sidebar__item--tag.tw-sidebar__item--active .tw-sidebar__count {
+	color: var(--tw-st-recurring) !important;
+}
+
+/* ============================================================
+   TAGS INDEX (dedicated page — /Tags)
+   ============================================================ */
+
+.tw-tags-index {
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 8px 20px 40px;
+}
+
+.tw-tags-index__empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 72px 20px;
+	text-align: center;
+	color: var(--tw-text-muted);
+}
+
+.v-icon.tw-tags-index__empty-icon { color: var(--tw-text-faint) !important; }
+
+.tw-tags-index__empty-title {
+	margin: 4px 0 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--tw-text);
+}
+
+.tw-tags-index__empty-hint {
+	margin: 0;
+	font-size: 13px;
+	color: var(--tw-text-muted);
+	max-width: 320px;
+}
+
+.tw-tags-index__list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius);
+	overflow: hidden;
+	background: var(--tw-bg);
+}
+
+.tw-tags-index__row {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--tw-border);
+	transition: background 120ms ease;
+}
+
+.tw-tags-index__row:last-child { border-bottom: none; }
+
+.tw-tags-index__row:hover { background: var(--tw-surface); }
+
+.tw-tags-index__main {
+	appearance: none;
+	background: transparent;
+	border: none;
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 16px;
+	font-family: var(--tw-font);
+	font-size: 14px;
+	color: var(--tw-text);
+	cursor: pointer;
+	text-align: left;
+}
+
+.v-icon.tw-tags-index__icon { color: var(--tw-st-recurring) !important; flex-shrink: 0; }
+
+.tw-tags-index__name {
+	font-family: 'SF Mono', Consolas, monospace;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--tw-text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+}
+
+.tw-tags-index__counts {
+	display: inline-flex;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.tw-tags-index__count {
+	display: inline-flex;
+	align-items: center;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--tw-surface);
+	color: var(--tw-text-muted);
+	white-space: nowrap;
+}
+
+.tw-tags-index__row:hover .tw-tags-index__count { background: var(--tw-bg); }
+
+.tw-tags-index__count--pending {
+	background: var(--tw-st-pending-soft);
+	color: var(--tw-st-pending);
+}
+
+.tw-tags-index__row:hover .tw-tags-index__count--pending { background: var(--tw-st-pending-soft); }
+
+.tw-tags-index__edit {
+	appearance: none;
+	background: transparent;
+	border: none;
+	border-left: 1px solid var(--tw-border);
+	color: var(--tw-text-muted);
+	font-family: var(--tw-font);
+	font-size: 12px;
+	font-weight: 500;
+	padding: 0 16px;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	transition: background 120ms ease, color 120ms ease;
+	flex-shrink: 0;
+}
+
+.tw-tags-index__edit:hover {
+	background: var(--tw-surface-hover);
+	color: var(--tw-text);
+}
+
+.tw-tags-index__edit .v-icon { color: inherit !important; }
+
+/* ============================================================
+   TAG MANAGE DIALOG
+   ============================================================ */
+
+.v-application .v-dialog .v-card .tw-tag-dialog__icon {
+	color: var(--tw-st-recurring) !important;
+	margin-right: 8px;
+}
+
+.tw-tag-dialog__title {
+	font-family: 'SF Mono', Consolas, monospace;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--tw-text);
+}
+
+.tw-tag-dialog__count {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--tw-text-muted);
+	background: var(--tw-surface);
+	padding: 2px 8px;
+	border-radius: 999px;
+}
+
+.v-application .v-dialog .v-card .tw-tag-dialog__body {
+	padding: 12px 20px 8px !important;
+}
+
+.tw-tag-dialog__label {
+	display: block;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--tw-text-faint);
+	margin-bottom: 6px;
+}
+
+.tw-tag-dialog__hint {
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--tw-text-faint);
+	line-height: 1.45;
+}
+
+.v-application .v-dialog .v-card .tw-tag-dialog__actions {
+	padding: 12px 20px 16px !important;
+	align-items: center;
+}
+
+.tw-tag-dialog__actions .tw-btn[disabled] {
+	opacity: 0.45;
+	cursor: not-allowed;
 }
 
 /* ============================================================

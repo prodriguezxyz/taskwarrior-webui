@@ -82,6 +82,9 @@ export default {
 		manifest: {
 			name: 'Taskwarrior-webui',
 			short_name: 'Taskwarrior-webui'
+		},
+		workbox: {
+			enabled: process.env.NODE_ENV === 'production'
 		}
 	},
 

@@ -8,8 +8,8 @@
 		/>
 		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
 
-		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter }">
-			<nav v-if="projectFilter" class="tw-tabs" role="tablist">
+		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !tagFilter }">
+			<nav v-if="projectFilter || tagFilter" class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
 					:key="st"
@@ -382,6 +382,7 @@ export default defineComponent({
 		const showColumnDialog = ref(false);
 
 		const projectFilter = computed(() => store.state.projectFilter);
+		const sidebarTagFilter = computed(() => store.state.tagFilter);
 		const tagFilter = ref<string[]>([]);
 		const priorityFilter: Ref<string | null> = ref(null);
 		const showFilters = ref(false);
@@ -400,10 +401,10 @@ export default defineComponent({
 			selected.value = [];
 		});
 
-		// Scope owns the status: Today → 'today', Inbox → 'pending', Project → user-picked.
-		watch([view, projectFilter], ([v, pf]) => {
+		// Scope owns the status: Today → 'today', Inbox → 'pending', Project/Tag → user-picked.
+		watch([view, projectFilter, sidebarTagFilter], ([v, pf, tf]) => {
 			if (v === 'today') status.value = 'today';
-			else if (!pf) status.value = 'pending';
+			else if (!pf && !tf) status.value = 'pending';
 			selected.value = [];
 		});
 
@@ -424,6 +425,7 @@ export default defineComponent({
 
 		const matchesFilters = (task: Task) => {
 			if (projectFilter.value && task.project !== projectFilter.value) return false;
+			if (sidebarTagFilter.value && !task.tags?.includes(sidebarTagFilter.value)) return false;
 			if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
 			if (tagFilter.value.length) {
 				if (!task.tags || !tagFilter.value.every(t => task.tags!.includes(t))) return false;
@@ -456,8 +458,8 @@ export default defineComponent({
 						passStatus = task.status === status;
 					}
 					if (!passStatus) return false;
-					// Inbox scope: when no project filter and not the today bucket, only unprojected
-					if (!projectFilter.value && status !== 'today' && task.project) return false;
+					// Inbox scope: when no project/tag filter and not the today bucket, only unprojected
+					if (!projectFilter.value && !sidebarTagFilter.value && status !== 'today' && task.project) return false;
 					return matchesFilters(task);
 				}) || [];
 
@@ -468,7 +470,7 @@ export default defineComponent({
 						_group: isOverdue(t) ? 'Overdue' : todayGroup
 					})) as Task[];
 				}
-				return filtered;
+				return filtered as Task[];
 			});
 		}
 		const classifiedTasks = reactive(tempTasks);
@@ -479,7 +481,7 @@ export default defineComponent({
 		});
 
 		const groupBy = computed((): string | undefined => {
-			if (!projectFilter.value) return undefined;
+			if (!projectFilter.value && !sidebarTagFilter.value) return undefined;
 			if (status.value !== 'today' && status.value !== 'pending') return undefined;
 			const bucket: any = (classifiedTasks as any)[status.value];
 			const arr: any[] = Array.isArray(bucket) ? bucket : (bucket?.value || []);
@@ -622,6 +624,7 @@ export default defineComponent({
 			statusLabels,
 
 			projectFilter,
+			sidebarTagFilter,
 			view,
 			currentItems,
 			tagFilter,

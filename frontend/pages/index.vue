@@ -7,13 +7,14 @@
 					{{ pageTitle }}
 					<span class="tw-page__count">{{ pendingCount }}</span>
 				</h1>
-				<div v-if="projectFilter" class="tw-page__meta">
+				<div v-if="projectFilter || tagFilter" class="tw-page__meta">
 					{{ progress }}% complete
 				</div>
 			</header>
 		</div>
 
-		<TaskList :tasks="tasks" />
+		<TagsIndex v-if="view === 'tags'" />
+		<TaskList v-else :tasks="tasks" />
 	</div>
 </template>
 
@@ -21,6 +22,7 @@
 import { defineComponent, computed, watch, ComputedRef, useStore, useContext } from '@nuxtjs/composition-api';
 import moment from 'moment';
 import TaskList from '../components/TaskList.vue';
+import TagsIndex from '../components/TagsIndex.vue';
 import { Task } from 'taskwarrior-lib';
 import { accessorType } from '../store';
 
@@ -65,22 +67,29 @@ export default defineComponent({
 		const tasks: ComputedRef<Task[]> = computed(() => store.state.tasks);
 
 		const projectFilter = computed(() => store.state.projectFilter);
+		const tagFilter = computed(() => store.state.tagFilter);
 		const view = computed(() => store.state.view);
 
 		const pageTitle = computed(() => {
 			if (view.value === 'today') return 'Today';
+			if (view.value === 'tags') return 'Tags';
+			if (tagFilter.value) return `#${tagFilter.value}`;
 			if (projectFilter.value) return projectFilter.value;
 			return 'Inbox';
 		});
 
 		const pageIcon = computed(() => {
 			if (view.value === 'today') return 'mdi-calendar-today';
+			if (view.value === 'tags') return 'mdi-tag-multiple-outline';
+			if (tagFilter.value) return 'mdi-tag-outline';
 			if (projectFilter.value) return 'mdi-folder-outline';
 			return 'mdi-inbox-outline';
 		});
 
 		const pageIconTone = computed(() => {
 			if (view.value === 'today') return 'tw-page__icon--today';
+			if (view.value === 'tags') return 'tw-page__icon--tag';
+			if (tagFilter.value) return 'tw-page__icon--tag';
 			if (projectFilter.value) return '';
 			return 'tw-page__icon--inbox';
 		});
@@ -96,6 +105,16 @@ export default defineComponent({
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
 				}).length;
 			}
+			if (view.value === 'tags') {
+				const set = new Set<string>();
+				for (const t of store.state.tasks) {
+					if (t.tags) for (const tg of t.tags) set.add(tg);
+				}
+				return set.size;
+			}
+			if (tagFilter.value) {
+				return base.filter((t: Task) => t.tags?.includes(tagFilter.value!)).length;
+			}
 			if (projectFilter.value) {
 				return base.filter((t: Task) => t.project === projectFilter.value).length;
 			}
@@ -103,6 +122,14 @@ export default defineComponent({
 		});
 
 		const progress = computed(() => {
+			if (tagFilter.value) {
+				const tg = tagFilter.value;
+				const rel = store.state.tasks.filter((t: Task) => t.tags?.includes(tg));
+				const completed = rel.reduce((acc: number, t: Task) => t.status === 'completed' ? acc + 1 : acc, 0);
+				const pending = rel.reduce((acc: number, t: Task) => t.status === 'pending' ? acc + 1 : acc, 0);
+				const total = completed + pending;
+				return total === 0 ? 100 : Math.round(100 * completed / total);
+			}
 			if (!projectFilter.value) return 0;
 			const proj = projectFilter.value;
 			const rel = store.state.tasks.filter((t: Task) => t.project === proj);
@@ -114,8 +141,10 @@ export default defineComponent({
 
 		return {
 			TaskList,
+			TagsIndex,
 			tasks,
 			projectFilter,
+			tagFilter,
 			view,
 			pageTitle,
 			pageIcon,

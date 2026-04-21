@@ -94,7 +94,7 @@
 				<button
 					type="button"
 					class="tw-sidebar__item tw-sidebar__item--inbox"
-					:class="{ 'tw-sidebar__item--active': view === 'all' && !projectFilter }"
+					:class="{ 'tw-sidebar__item--active': view === 'all' && !projectFilter && !tagFilter }"
 					@click="selectInbox"
 				>
 					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--inbox">mdi-inbox-outline</v-icon>
@@ -111,6 +111,17 @@
 					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today">mdi-calendar-today</v-icon>
 					<span class="tw-sidebar__label">Today</span>
 					<span v-if="todayCount > 0" class="tw-sidebar__count tw-sidebar__count--today">{{ todayCount }}</span>
+				</button>
+
+				<button
+					type="button"
+					class="tw-sidebar__item tw-sidebar__item--tag"
+					:class="{ 'tw-sidebar__item--active': view === 'tags' || (view === 'all' && tagFilter) }"
+					@click="selectTagsIndex"
+				>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--tag">mdi-tag-multiple-outline</v-icon>
+					<span class="tw-sidebar__label">Tags</span>
+					<span v-if="totalTags > 0" class="tw-sidebar__count">{{ totalTags }}</span>
 				</button>
 
 				<div v-if="projectList.length" class="tw-sidebar__section">
@@ -146,7 +157,7 @@ import SearchPalette from '../components/SearchPalette.vue';
 import { accessorType } from '../store';
 
 export default defineComponent({
-	setup(_props, ctx) {
+	setup(_props, _ctx) {
 		const context = useContext();
 		const store = useStore<typeof accessorType>();
 		store.dispatch('fetchHiddenColumns');
@@ -163,6 +174,7 @@ export default defineComponent({
 		});
 
 		const projectFilter = computed(() => store.state.projectFilter);
+		const tagFilter = computed(() => store.state.tagFilter);
 		const view = computed(() => store.state.view);
 
 		const pendingTasks = computed(() =>
@@ -172,6 +184,14 @@ export default defineComponent({
 		const totalPending = computed(() =>
 			pendingTasks.value.filter((t: any) => !t.project).length
 		);
+
+		const totalTags = computed(() => {
+			const set = new Set<string>();
+			for (const t of store.state.tasks) {
+				if (t.tags) for (const tg of t.tags) set.add(tg);
+			}
+			return set.size;
+		});
 
 		const todayCount = computed(() => {
 			const endOfToday = moment().endOf('day');
@@ -199,17 +219,26 @@ export default defineComponent({
 
 		const setProject = (name: string | null) => {
 			store.commit('setProjectFilter', name);
+			store.commit('setTagFilter', null);
 			store.commit('setView', 'all');
 		};
 
 		const selectInbox = () => {
 			store.commit('setProjectFilter', null);
+			store.commit('setTagFilter', null);
 			store.commit('setView', 'all');
 		};
 
 		const selectToday = () => {
 			store.commit('setProjectFilter', null);
+			store.commit('setTagFilter', null);
 			store.commit('setView', 'today');
+		};
+
+		const selectTagsIndex = () => {
+			store.commit('setProjectFilter', null);
+			store.commit('setTagFilter', null);
+			store.commit('setView', 'tags');
 		};
 
 		const taskDialogOpen = computed(() => store.state.taskDialog.open);
@@ -280,13 +309,16 @@ export default defineComponent({
 			profiles,
 			currentProfile,
 			projectFilter,
+			tagFilter,
 			view,
 			totalPending,
 			todayCount,
 			projectList,
+			totalTags,
 			setProject,
 			selectInbox,
 			selectToday,
+			selectTagsIndex,
 
 			taskDialogOpen,
 			taskDialogTask,

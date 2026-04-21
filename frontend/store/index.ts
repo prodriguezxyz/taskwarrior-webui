@@ -19,7 +19,8 @@ export const state = () => ({
 	profiles: [] as Array<{ name: string }>,
 	defaultProfile: '',
 	projectFilter: null as string | null,
-	view: 'all' as 'all' | 'today',
+	tagFilter: null as string | null,
+	view: 'all' as 'all' | 'today' | 'tags',
 	searchOpen: false,
 	taskDialog: {
 		open: false,
@@ -31,9 +32,13 @@ export type RootState = ReturnType<typeof state>;
 
 export const getters: GetterTree<RootState, RootState> = {
 	projects: state => state.tasks.map(task => task.project).filter(p => p !== undefined),
-	tags: state => state.tasks.reduce((tags: string[], task) => {
-		return task.tags ? tags.concat(task.tags) : tags;
-	}, [])
+	tags: state => {
+		const set = new Set<string>();
+		for (const task of state.tasks) {
+			if (task.tags) for (const t of task.tags) set.add(t);
+		}
+		return Array.from(set).sort();
+	}
 };
 
 export const mutations: MutationTree<RootState> = {
@@ -68,7 +73,11 @@ export const mutations: MutationTree<RootState> = {
 		state.projectFilter = value;
 	},
 
-	setView(state, value: 'all' | 'today') {
+	setTagFilter(state, value: string | null) {
+		state.tagFilter = value;
+	},
+
+	setView(state, value: 'all' | 'today' | 'tags') {
 		state.view = value;
 	},
 
