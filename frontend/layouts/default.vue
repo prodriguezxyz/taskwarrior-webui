@@ -1,6 +1,8 @@
 <template>
 	<v-app class="task-app">
 		<SettingsDialog v-model="settingsDialog" />
+		<TaskDialog :value="taskDialogOpen" :task="taskDialogTask || undefined" @input="onTaskDialogInput" />
+		<SearchPalette />
 
 		<v-snackbar
 			v-model="snackbar"
@@ -68,6 +70,29 @@
 			<nav class="tw-sidebar__nav">
 				<button
 					type="button"
+					class="tw-sidebar__item tw-sidebar__item--primary"
+					title="New task"
+					@click="openNewTask"
+				>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--primary">mdi-plus-circle</v-icon>
+					<span class="tw-sidebar__label">Add task</span>
+				</button>
+
+				<button
+					type="button"
+					class="tw-sidebar__item"
+					title="Search (/ or Ctrl+K)"
+					@click="openSearch"
+				>
+					<v-icon size="16" class="tw-sidebar__icon">mdi-magnify</v-icon>
+					<span class="tw-sidebar__label">Search</span>
+					<span class="tw-sidebar__shortcut">/</span>
+				</button>
+
+				<div class="tw-sidebar__divider" />
+
+				<button
+					type="button"
 					class="tw-sidebar__item"
 					:class="{ 'tw-sidebar__item--active': !projectFilter }"
 					@click="setProject(null)"
@@ -102,8 +127,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useContext, useStore, computed, onErrorCaptured, ref } from '@nuxtjs/composition-api';
+import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref } from '@nuxtjs/composition-api';
 import SettingsDialog from '../components/SettingsDialog.vue';
+import TaskDialog from '../components/TaskDialog.vue';
+import SearchPalette from '../components/SearchPalette.vue';
 import { accessorType } from '../store';
 
 export default defineComponent({
@@ -148,6 +175,31 @@ export default defineComponent({
 		const setProject = (name: string | null) => {
 			store.commit('setProjectFilter', name);
 		};
+
+		const taskDialogOpen = computed(() => store.state.taskDialog.open);
+		const taskDialogTask = computed(() => store.state.taskDialog.task);
+
+		const onTaskDialogInput = (val: boolean) => {
+			if (!val) store.commit('closeTaskDialog');
+		};
+
+		const openNewTask = () => store.commit('openNewTaskDialog');
+		const openSearch = () => store.commit('setSearchOpen', true);
+
+		const onGlobalKeydown = (e: KeyboardEvent) => {
+			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+			const isSlash = e.key === '/';
+			if (!isCtrlK && !isSlash) return;
+			if (isSlash) {
+				const t = e.target as HTMLElement | null;
+				if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+			}
+			e.preventDefault();
+			openSearch();
+		};
+
+		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
+		onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
 
 		const dark = computed({
 			get: () => context.$vuetify.theme.dark,
@@ -196,7 +248,15 @@ export default defineComponent({
 			projectList,
 			setProject,
 
-			SettingsDialog
+			taskDialogOpen,
+			taskDialogTask,
+			onTaskDialogInput,
+			openNewTask,
+			openSearch,
+
+			SettingsDialog,
+			TaskDialog,
+			SearchPalette
 		};
 	}
 });

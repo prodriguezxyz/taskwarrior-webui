@@ -18,7 +18,12 @@ export const state = () => ({
 	hiddenColumns: [] as string[],
 	profiles: [] as Array<{ name: string }>,
 	defaultProfile: '',
-	projectFilter: null as string | null
+	projectFilter: null as string | null,
+	searchOpen: false,
+	taskDialog: {
+		open: false,
+		task: null as Task | null
+	}
 });
 
 export type RootState = ReturnType<typeof state>;
@@ -60,6 +65,22 @@ export const mutations: MutationTree<RootState> = {
 
 	setProjectFilter(state, value: string | null) {
 		state.projectFilter = value;
+	},
+
+	setSearchOpen(state, value: boolean) {
+		state.searchOpen = value;
+	},
+
+	openNewTaskDialog(state) {
+		state.taskDialog = { open: true, task: null };
+	},
+
+	openEditTaskDialog(state, task: Task) {
+		state.taskDialog = { open: true, task };
+	},
+
+	closeTaskDialog(state) {
+		state.taskDialog = { open: false, task: null };
 	}
 };
 

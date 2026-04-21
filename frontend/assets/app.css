@@ -247,25 +247,6 @@ body { font-family: var(--tw-font); }
 }
 
 /* ============================================================
-   SEARCH BANNER (replaces tabs when searching)
-   ============================================================ */
-
-.tw-search-banner {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 10px 12px;
-	font-size: 13px;
-	color: var(--tw-text-muted);
-	flex: 0 1 auto;
-	min-width: 0;
-}
-
-.tw-search-banner strong { color: var(--tw-text); font-weight: 600; }
-
-.tw-search-banner__icon { color: var(--tw-text-faint) !important; }
-
-/* ============================================================
    TOOLBAR (tabs + actions on one row)
    ============================================================ */
 
@@ -542,6 +523,253 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-accent) !important;
 }
 
+/* Prominent "Add task" entry (top of sidebar) */
+.tw-sidebar__item--primary,
+.tw-sidebar__item--primary:hover {
+	color: var(--tw-accent);
+	background: transparent;
+	font-weight: 600;
+}
+
+.tw-sidebar__item--primary:hover {
+	background: var(--tw-accent-soft);
+}
+
+.tw-sidebar__icon--primary { color: var(--tw-accent) !important; }
+
+.tw-sidebar__item--primary:hover .tw-sidebar__icon--primary {
+	color: var(--tw-accent-hover) !important;
+}
+
+.tw-sidebar__shortcut {
+	font-family: 'SF Mono', Consolas, monospace;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--tw-text-faint);
+	padding: 1px 6px;
+	border-radius: 3px;
+	background: var(--tw-surface);
+	border: 1px solid var(--tw-border);
+	min-width: 20px;
+	text-align: center;
+	line-height: 1.3;
+}
+
+.tw-sidebar__divider {
+	height: 1px;
+	background: var(--tw-border);
+	margin: 10px 2px;
+}
+
+/* ============================================================
+   SEARCH PALETTE (command palette overlay)
+   ============================================================ */
+
+.v-dialog.tw-palette__dialog {
+	box-shadow: var(--tw-shadow-md) !important;
+	border-radius: var(--tw-radius) !important;
+	margin-top: 10vh;
+	align-self: flex-start;
+	overflow: hidden;
+}
+
+.tw-palette {
+	background: var(--tw-bg);
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius);
+	display: flex;
+	flex-direction: column;
+	max-height: 70vh;
+	overflow: hidden;
+}
+
+.tw-palette__inputwrap {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--tw-border);
+}
+
+.tw-palette__icon { color: var(--tw-text-muted) !important; }
+
+.tw-palette__input {
+	flex: 1;
+	border: none;
+	outline: none;
+	background: transparent;
+	font-family: var(--tw-font);
+	font-size: 15px;
+	color: var(--tw-text);
+	padding: 0;
+	min-width: 0;
+}
+
+.tw-palette__input::placeholder { color: var(--tw-text-faint); }
+
+.tw-palette__clear {
+	appearance: none;
+	background: transparent;
+	border: none;
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--tw-radius-sm);
+	color: var(--tw-text-faint);
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background 120ms ease, color 120ms ease;
+}
+
+.tw-palette__clear:hover {
+	background: var(--tw-surface-hover);
+	color: var(--tw-text);
+}
+
+.tw-palette__clear .v-icon { color: inherit !important; }
+
+.tw-palette__results {
+	overflow-y: auto;
+	padding: 4px;
+}
+
+.tw-palette__item {
+	appearance: none;
+	background: transparent;
+	border: none;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: var(--tw-radius-sm);
+	cursor: pointer;
+	text-align: left;
+	font-family: var(--tw-font);
+	font-size: 13px;
+	color: var(--tw-text);
+	min-width: 0;
+}
+
+.tw-palette__item--active,
+.tw-palette__item:hover {
+	background: var(--tw-surface);
+}
+
+.tw-palette__item-icon { color: var(--tw-text-muted) !important; flex-shrink: 0; }
+.tw-palette__item-icon--completed { color: var(--tw-st-completed) !important; }
+.tw-palette__item-icon--waiting { color: var(--tw-st-waiting) !important; }
+.tw-palette__item-icon--recurring { color: var(--tw-st-recurring) !important; }
+.tw-palette__item-icon--overdue { color: var(--tw-danger) !important; }
+.tw-palette__item-icon--pending { color: var(--tw-st-pending) !important; }
+.tw-palette__item-icon--deleted { color: var(--tw-st-deleted) !important; }
+
+.tw-palette__item-desc {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+
+.tw-palette__mark {
+	background: var(--tw-accent-soft);
+	color: var(--tw-accent);
+	border-radius: 2px;
+	padding: 0 1px;
+}
+
+.tw-palette__item-meta {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	color: var(--tw-text-muted);
+	flex-shrink: 0;
+	max-width: 160px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tw-palette__item-meta-icon { color: var(--tw-text-faint) !important; }
+
+.tw-palette__item-tags {
+	display: inline-flex;
+	gap: 4px;
+	flex-shrink: 0;
+}
+
+.tw-palette__item-tag {
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--tw-text-muted);
+	background: var(--tw-surface);
+	padding: 1px 6px;
+	border-radius: 999px;
+}
+
+.tw-palette__item--active .tw-palette__item-tag,
+.tw-palette__item:hover .tw-palette__item-tag {
+	background: var(--tw-bg);
+}
+
+.tw-palette__item-due {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font-size: 11px;
+	color: var(--tw-text-muted);
+	flex-shrink: 0;
+}
+
+.tw-palette__item-due .v-icon { color: var(--tw-text-faint) !important; }
+
+.tw-palette__empty {
+	padding: 24px;
+	text-align: center;
+	font-size: 13px;
+	color: var(--tw-text-muted);
+}
+
+.tw-palette__hint {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 16px;
+	font-size: 12px;
+	color: var(--tw-text-faint);
+	border-top: 1px solid var(--tw-border);
+	background: var(--tw-surface);
+}
+
+.tw-palette__hint-keys {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.v-application .tw-palette__hint-keys kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: 'SF Mono', Consolas, monospace;
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--tw-text-muted) !important;
+	background: var(--tw-bg) !important;
+	border: 1px solid var(--tw-border);
+	border-radius: 3px;
+	padding: 0 5px;
+	line-height: 1;
+	min-width: 18px;
+	height: 18px;
+	margin-right: 2px;
+}
+
 /* ============================================================
    FILTER BAR (tags + priority chips)
    ============================================================ */
@@ -656,33 +884,6 @@ body { font-family: var(--tw-font); }
 .tw-selbar__clear:hover { color: var(--tw-text); background: var(--tw-surface-hover); }
 
 .tw-selbar__spacer { flex: 1; }
-
-/* Search input */
-.tw-search-input.v-text-field.v-text-field--outlined {
-	font-size: 13px;
-	width: 220px;
-}
-
-.tw-search-input.v-text-field.v-text-field--outlined fieldset {
-	border-radius: var(--tw-radius-sm) !important;
-	border: 1px solid transparent !important;
-}
-
-.tw-search-input.v-text-field.v-text-field--outlined .v-input__slot {
-	background: var(--tw-surface) !important;
-	border-radius: var(--tw-radius-sm) !important;
-}
-
-.tw-search-input.v-text-field--outlined.v-input--is-focused fieldset {
-	border-color: var(--tw-border) !important;
-	border-width: 1px !important;
-}
-
-.tw-search-input .v-input__icon .v-icon { color: var(--tw-text-faint) !important; }
-
-.tw-search-input .v-input__slot { min-height: 32px !important; }
-.tw-search-input .v-text-field__slot { min-height: 32px; }
-.tw-search-input input { padding: 6px 0 !important; }
 
 /* ============================================================
    DATA TABLE

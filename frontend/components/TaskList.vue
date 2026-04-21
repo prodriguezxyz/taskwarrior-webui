@@ -6,11 +6,10 @@
 			:text="confirmation.text"
 			@yes="confirmation.handler"
 		/>
-		<TaskDialog v-model="showTaskDialog" :task="currentTask || undefined" />
 		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
 
 		<div class="tw-toolbar">
-			<nav v-if="!isSearching" class="tw-tabs" role="tablist">
+			<nav class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
 					:key="st"
@@ -33,39 +32,9 @@
 				</button>
 			</nav>
 
-			<div v-if="isSearching" class="tw-search-banner">
-				<v-icon size="15" class="tw-search-banner__icon">mdi-magnify</v-icon>
-				<span>Searching all tasks · <strong>{{ currentItems.length }}</strong> {{ currentItems.length === 1 ? 'result' : 'results' }}</span>
-			</div>
-
 			<div class="tw-toolbar__spacer" />
 
 			<div class="tw-toolbar__actions">
-				<v-text-field
-					v-if="searchOpen"
-					ref="searchInput"
-					v-model="search"
-					prepend-inner-icon="mdi-magnify"
-					placeholder="Search…"
-					outlined
-					dense
-					clearable
-					hide-details
-					single-line
-					class="tw-search-input"
-					@blur="handleSearchBlur"
-					@keydown.esc="closeSearch"
-				/>
-				<button
-					v-else
-					type="button"
-					class="tw-action tw-action--ghost"
-					title="Search (/ or Ctrl+K)"
-					@click="openSearch"
-				>
-					<v-icon size="18">mdi-magnify</v-icon>
-				</button>
-
 				<button
 					type="button"
 					class="tw-action tw-action--ghost"
@@ -102,16 +71,6 @@
 					@click="showColumnDialog = true"
 				>
 					<v-icon size="18">mdi-view-column-outline</v-icon>
-				</button>
-
-				<button
-					type="button"
-					class="tw-btn tw-btn--primary"
-					title="New task"
-					@click="newTask"
-				>
-					<v-icon size="16" left>mdi-plus</v-icon>
-					<span>New task</span>
 				</button>
 			</div>
 		</div>
@@ -300,10 +259,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, computed, reactive, ref, watch, nextTick, onMounted, onBeforeUnmount, ComputedRef, Ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
-import TaskDialog from '../components/TaskDialog.vue';
 import ConfirmationDialog from '../components/ConfirmationDialog.vue';
 import ColumnDialog from '../components/ColumnDialog.vue';
 import moment from 'moment';
@@ -421,62 +379,10 @@ export default defineComponent({
 
 		const showColumnDialog = ref(false);
 
-		const search = ref('');
-		const searchOpen = ref(false);
-		const searchInput: Ref<any> = ref(null);
-
-		watch(search, () => {
-			selected.value = [];
-		});
-
-		const openSearch = async () => {
-			searchOpen.value = true;
-			await nextTick();
-			searchInput.value?.focus?.();
-		};
-
-		const closeSearch = () => {
-			search.value = '';
-			searchOpen.value = false;
-		};
-
-		const handleSearchBlur = () => {
-			if (!search.value) {
-				searchOpen.value = false;
-			}
-		};
-
-		const onGlobalKeydown = (e: KeyboardEvent) => {
-			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
-			const isSlash = e.key === '/';
-			if (!isCtrlK && !isSlash) return;
-			if (isSlash) {
-				const t = e.target as HTMLElement | null;
-				if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-			}
-			e.preventDefault();
-			openSearch();
-		};
-
-		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
-		onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
-
-		const matchesSearch = (task: Task, q: string) => {
-			if (!q) return true;
-			const needle = q.toLowerCase();
-			if (task.description?.toLowerCase().includes(needle)) return true;
-			if (task.project?.toLowerCase().includes(needle)) return true;
-			if (task.tags?.some(t => t.toLowerCase().includes(needle))) return true;
-			if (task.annotations?.some(a => a.description?.toLowerCase().includes(needle))) return true;
-			return false;
-		};
-
 		const projectFilter = computed(() => store.state.projectFilter);
 		const tagFilter = ref<string[]>([]);
 		const priorityFilter: Ref<string | null> = ref(null);
 		const showFilters = ref(false);
-
-		const isSearching = computed(() => !!search.value);
 
 		const availableTags = computed(() => {
 			const set = new Set<string>();
@@ -521,7 +427,6 @@ export default defineComponent({
 		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
 		for (const status of allStatus) {
 			tempTasks[status] = computed((): Task[] => {
-				const q = search.value || '';
 				const endOfToday = status === 'today' ? moment().endOf('day') : null;
 				const filtered = props.tasks?.filter(task => {
 					let passStatus: boolean;
@@ -541,7 +446,7 @@ export default defineComponent({
 					else {
 						passStatus = task.status === status;
 					}
-					return passStatus && matchesSearch(task, q) && matchesFilters(task);
+					return passStatus && matchesFilters(task);
 				}) || [];
 
 				if (status === 'today' || status === 'pending') {
@@ -556,27 +461,12 @@ export default defineComponent({
 		}
 		const classifiedTasks = reactive(tempTasks);
 
-		const searchResults = computed((): Task[] => {
-			const q = search.value || '';
-			if (!q) return [];
-			return props.tasks?.filter(task => {
-				if (!matchesSearch(task, q)) return false;
-				if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
-				if (tagFilter.value.length) {
-					if (!task.tags || !tagFilter.value.every(t => task.tags!.includes(t))) return false;
-				}
-				return true;
-			}) || [];
-		});
-
 		const currentItems = computed((): Task[] => {
-			if (isSearching.value) return searchResults.value;
 			const bucket: any = (classifiedTasks as any)[status.value];
 			return Array.isArray(bucket) ? bucket : (bucket?.value || []);
 		});
 
 		const groupBy = computed(() => {
-			if (isSearching.value) return '';
 			if (status.value !== 'today' && status.value !== 'pending') return '';
 			const bucket: any = (classifiedTasks as any)[status.value];
 			const arr: any[] = Array.isArray(bucket) ? bucket : (bucket?.value || []);
@@ -594,9 +484,6 @@ export default defineComponent({
 			text: '',
 			handler: () => {}
 		});
-
-		const showTaskDialog = ref(false);
-		const currentTask: Ref<Task | null> = ref(null);
 
 		const showSyncBtn = computed(() => {
 			return store.state.settings.autoSync !== '0';
@@ -618,14 +505,8 @@ export default defineComponent({
 			}
 		};
 
-		const newTask = () => {
-			showTaskDialog.value = true;
-			currentTask.value = null;
-		};
-
 		const editTask = (task: Task) => {
-			showTaskDialog.value = true;
-			currentTask.value = _.cloneDeep(task);
+			store.commit('openEditTaskDialog', _.cloneDeep(task));
 		};
 
 		const completeTasks = async (tasks: Task[]) => {
@@ -711,21 +592,12 @@ export default defineComponent({
 			selected,
 			showSyncBtn,
 			syncTasks,
-			newTask,
-			currentTask,
 			editTask,
 			deleteTasks,
 			completeTasks,
 			restoreTasks,
-			showTaskDialog,
 			showConfirmationDialog,
 			showColumnDialog,
-			search,
-			searchOpen,
-			searchInput,
-			openSearch,
-			closeSearch,
-			handleSearchBlur,
 			confirmation,
 			displayDate,
 			rowClass,
@@ -734,7 +606,6 @@ export default defineComponent({
 			statusLabels,
 
 			projectFilter,
-			isSearching,
 			currentItems,
 			tagFilter,
 			priorityFilter,
@@ -745,7 +616,6 @@ export default defineComponent({
 			togglePriority,
 			clearFilters,
 
-			TaskDialog,
 			ConfirmationDialog,
 			ColumnDialog
 		};
