@@ -1,3 +1,7 @@
 .task
 .taskrc
 dist
+
+# deploy
+.deploy.env
+tw.tar.gz
