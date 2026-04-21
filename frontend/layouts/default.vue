@@ -3,6 +3,7 @@
 		<SettingsDialog v-model="settingsDialog" />
 		<TaskDialog :value="taskDialogOpen" :task="taskDialogTask || undefined" @input="onTaskDialogInput" />
 		<SearchPalette />
+		<ProjectManageDialog v-model="projectDialogOpen" :project="projectDialogName" />
 
 		<v-snackbar
 			v-model="snackbar"
@@ -125,19 +126,39 @@
 				</button>
 
 				<div v-if="projectList.length" class="tw-sidebar__section">
-					<span class="tw-sidebar__heading">Projects</span>
 					<button
+						type="button"
+						class="tw-sidebar__heading tw-sidebar__heading--button"
+						:class="{ 'tw-sidebar__heading--active': view === 'projects' }"
+						title="Manage projects"
+						@click="selectProjectsIndex"
+					>
+						Projects
+					</button>
+					<div
 						v-for="p in projectList"
 						:key="p.name"
-						type="button"
-						class="tw-sidebar__item"
-						:class="{ 'tw-sidebar__item--active': view === 'all' && projectFilter === p.name }"
-						@click="setProject(p.name)"
+						class="tw-sidebar__project"
 					>
-						<v-icon size="16" class="tw-sidebar__icon">mdi-folder-outline</v-icon>
-						<span class="tw-sidebar__label">{{ p.name }}</span>
-						<span v-if="p.count > 0" class="tw-sidebar__count">{{ p.count }}</span>
-					</button>
+						<button
+							type="button"
+							class="tw-sidebar__item tw-sidebar__project-main"
+							:class="{ 'tw-sidebar__item--active': view === 'all' && projectFilter === p.name }"
+							@click="setProject(p.name)"
+						>
+							<v-icon size="16" class="tw-sidebar__icon">mdi-folder-outline</v-icon>
+							<span class="tw-sidebar__label">{{ p.name }}</span>
+							<span v-if="p.count > 0" class="tw-sidebar__count tw-sidebar__project-count">{{ p.count }}</span>
+						</button>
+						<button
+							type="button"
+							class="tw-sidebar__project-edit"
+							title="Rename or delete project"
+							@click.stop="manageProject(p.name)"
+						>
+							<v-icon size="14">mdi-dots-horizontal</v-icon>
+						</button>
+					</div>
 				</div>
 			</nav>
 		</v-navigation-drawer>
@@ -154,6 +175,7 @@ import moment from 'moment';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 import SearchPalette from '../components/SearchPalette.vue';
+import ProjectManageDialog from '../components/ProjectManageDialog.vue';
 import { accessorType } from '../store';
 
 export default defineComponent({
@@ -241,6 +263,12 @@ export default defineComponent({
 			store.commit('setView', 'tags');
 		};
 
+		const selectProjectsIndex = () => {
+			store.commit('setProjectFilter', null);
+			store.commit('setTagFilter', null);
+			store.commit('setView', 'projects');
+		};
+
 		const taskDialogOpen = computed(() => store.state.taskDialog.open);
 		const taskDialogTask = computed(() => store.state.taskDialog.task);
 
@@ -250,6 +278,13 @@ export default defineComponent({
 
 		const openNewTask = () => store.commit('openNewTaskDialog');
 		const openSearch = () => store.commit('setSearchOpen', true);
+
+		const projectDialogOpen = ref(false);
+		const projectDialogName = ref('');
+		const manageProject = (name: string) => {
+			projectDialogName.value = name;
+			projectDialogOpen.value = true;
+		};
 
 		const onGlobalKeydown = (e: KeyboardEvent) => {
 			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
@@ -319,6 +354,7 @@ export default defineComponent({
 			selectInbox,
 			selectToday,
 			selectTagsIndex,
+			selectProjectsIndex,
 
 			taskDialogOpen,
 			taskDialogTask,
@@ -326,9 +362,14 @@ export default defineComponent({
 			openNewTask,
 			openSearch,
 
+			projectDialogOpen,
+			projectDialogName,
+			manageProject,
+
 			SettingsDialog,
 			TaskDialog,
-			SearchPalette
+			SearchPalette,
+			ProjectManageDialog
 		};
 	}
 });

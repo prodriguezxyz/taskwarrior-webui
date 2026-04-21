@@ -503,6 +503,29 @@ body { font-family: var(--tw-font); }
 	padding: 0 10px 6px;
 }
 
+/* Clickable variant — preserves the heading look, adds hover/active states */
+.tw-sidebar__heading--button {
+	appearance: none;
+	background: transparent;
+	border: none;
+	display: block;
+	text-align: left;
+	width: 100%;
+	font-family: var(--tw-font);
+	cursor: pointer;
+	border-radius: var(--tw-radius-sm);
+	transition: color 120ms ease;
+}
+
+.tw-sidebar__heading--button:hover {
+	color: var(--tw-text-muted);
+}
+
+.tw-sidebar__heading--active,
+.tw-sidebar__heading--active:hover {
+	color: var(--tw-accent);
+}
+
 .tw-sidebar__item {
 	appearance: none;
 	background: transparent;
@@ -625,17 +648,69 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-st-recurring) !important;
 }
 
+/* Projects sidebar entries — button row with edit affordance on hover */
+.tw-sidebar__project {
+	position: relative;
+}
+
+.tw-sidebar__project-main {
+	width: 100%;
+}
+
+.tw-sidebar__project-count {
+	transition: opacity 120ms ease;
+}
+
+.tw-sidebar__project:hover .tw-sidebar__project-count {
+	opacity: 0;
+}
+
+.tw-sidebar__project-edit {
+	appearance: none;
+	background: transparent;
+	border: none;
+	position: absolute;
+	right: 6px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 22px;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--tw-radius-sm);
+	color: var(--tw-text-faint);
+	cursor: pointer;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.tw-sidebar__project:hover .tw-sidebar__project-edit {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.tw-sidebar__project-edit:hover {
+	background: var(--tw-surface);
+	color: var(--tw-text);
+}
+
+.tw-sidebar__project-edit .v-icon { color: inherit !important; }
+
 /* ============================================================
-   TAGS INDEX (dedicated page — /Tags)
+   TAGS / PROJECTS INDEX (dedicated pages)
    ============================================================ */
 
-.tw-tags-index {
+.tw-tags-index,
+.tw-projects-index {
 	max-width: 900px;
 	margin: 0 auto;
 	padding: 8px 20px 40px;
 }
 
-.tw-tags-index__empty {
+.tw-tags-index__empty,
+.tw-projects-index__empty {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -646,23 +721,27 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-text-muted);
 }
 
-.v-icon.tw-tags-index__empty-icon { color: var(--tw-text-faint) !important; }
+.v-icon.tw-tags-index__empty-icon,
+.v-icon.tw-projects-index__empty-icon { color: var(--tw-text-faint) !important; }
 
-.tw-tags-index__empty-title {
+.tw-tags-index__empty-title,
+.tw-projects-index__empty-title {
 	margin: 4px 0 0;
 	font-size: 14px;
 	font-weight: 600;
 	color: var(--tw-text);
 }
 
-.tw-tags-index__empty-hint {
+.tw-tags-index__empty-hint,
+.tw-projects-index__empty-hint {
 	margin: 0;
 	font-size: 13px;
 	color: var(--tw-text-muted);
 	max-width: 320px;
 }
 
-.tw-tags-index__list {
+.tw-tags-index__list,
+.tw-projects-index__list {
 	list-style: none;
 	padding: 0;
 	margin: 0;
@@ -672,18 +751,22 @@ body { font-family: var(--tw-font); }
 	background: var(--tw-bg);
 }
 
-.tw-tags-index__row {
+.tw-tags-index__row,
+.tw-projects-index__row {
 	display: flex;
 	align-items: stretch;
 	border-bottom: 1px solid var(--tw-border);
 	transition: background 120ms ease;
 }
 
-.tw-tags-index__row:last-child { border-bottom: none; }
+.tw-tags-index__row:last-child,
+.tw-projects-index__row:last-child { border-bottom: none; }
 
-.tw-tags-index__row:hover { background: var(--tw-surface); }
+.tw-tags-index__row:hover,
+.tw-projects-index__row:hover { background: var(--tw-surface); }
 
-.tw-tags-index__main {
+.tw-tags-index__main,
+.tw-projects-index__main {
 	appearance: none;
 	background: transparent;
 	border: none;
@@ -701,8 +784,10 @@ body { font-family: var(--tw-font); }
 }
 
 .v-icon.tw-tags-index__icon { color: var(--tw-st-recurring) !important; flex-shrink: 0; }
+.v-icon.tw-projects-index__icon { color: var(--tw-text-muted) !important; flex-shrink: 0; }
 
-.tw-tags-index__name {
+.tw-tags-index__name,
+.tw-projects-index__name {
 	font-family: 'SF Mono', Consolas, monospace;
 	font-size: 13px;
 	font-weight: 600;
@@ -714,13 +799,15 @@ body { font-family: var(--tw-font); }
 	min-width: 0;
 }
 
-.tw-tags-index__counts {
+.tw-tags-index__counts,
+.tw-projects-index__counts {
 	display: inline-flex;
 	gap: 6px;
 	flex-shrink: 0;
 }
 
-.tw-tags-index__count {
+.tw-tags-index__count,
+.tw-projects-index__count {
 	display: inline-flex;
 	align-items: center;
 	font-size: 11px;
@@ -732,16 +819,20 @@ body { font-family: var(--tw-font); }
 	white-space: nowrap;
 }
 
-.tw-tags-index__row:hover .tw-tags-index__count { background: var(--tw-bg); }
+.tw-tags-index__row:hover .tw-tags-index__count,
+.tw-projects-index__row:hover .tw-projects-index__count { background: var(--tw-bg); }
 
-.tw-tags-index__count--pending {
+.tw-tags-index__count--pending,
+.tw-projects-index__count--pending {
 	background: var(--tw-st-pending-soft);
 	color: var(--tw-st-pending);
 }
 
-.tw-tags-index__row:hover .tw-tags-index__count--pending { background: var(--tw-st-pending-soft); }
+.tw-tags-index__row:hover .tw-tags-index__count--pending,
+.tw-projects-index__row:hover .tw-projects-index__count--pending { background: var(--tw-st-pending-soft); }
 
-.tw-tags-index__edit {
+.tw-tags-index__edit,
+.tw-projects-index__edit {
 	appearance: none;
 	background: transparent;
 	border: none;
@@ -759,15 +850,17 @@ body { font-family: var(--tw-font); }
 	flex-shrink: 0;
 }
 
-.tw-tags-index__edit:hover {
+.tw-tags-index__edit:hover,
+.tw-projects-index__edit:hover {
 	background: var(--tw-surface-hover);
 	color: var(--tw-text);
 }
 
-.tw-tags-index__edit .v-icon { color: inherit !important; }
+.tw-tags-index__edit .v-icon,
+.tw-projects-index__edit .v-icon { color: inherit !important; }
 
 /* ============================================================
-   TAG MANAGE DIALOG
+   TAG / PROJECT MANAGE DIALOGS
    ============================================================ */
 
 .v-application .v-dialog .v-card .tw-tag-dialog__icon {
@@ -775,14 +868,21 @@ body { font-family: var(--tw-font); }
 	margin-right: 8px;
 }
 
-.tw-tag-dialog__title {
+.v-application .v-dialog .v-card .tw-project-dialog__icon {
+	color: var(--tw-text-muted) !important;
+	margin-right: 8px;
+}
+
+.tw-tag-dialog__title,
+.tw-project-dialog__title {
 	font-family: 'SF Mono', Consolas, monospace;
 	font-size: 14px;
 	font-weight: 600;
 	color: var(--tw-text);
 }
 
-.tw-tag-dialog__count {
+.tw-tag-dialog__count,
+.tw-project-dialog__count {
 	font-size: 12px;
 	font-weight: 500;
 	color: var(--tw-text-muted);
@@ -791,11 +891,13 @@ body { font-family: var(--tw-font); }
 	border-radius: 999px;
 }
 
-.v-application .v-dialog .v-card .tw-tag-dialog__body {
+.v-application .v-dialog .v-card .tw-tag-dialog__body,
+.v-application .v-dialog .v-card .tw-project-dialog__body {
 	padding: 12px 20px 8px !important;
 }
 
-.tw-tag-dialog__label {
+.tw-tag-dialog__label,
+.tw-project-dialog__label {
 	display: block;
 	font-size: 11px;
 	font-weight: 600;
@@ -805,19 +907,22 @@ body { font-family: var(--tw-font); }
 	margin-bottom: 6px;
 }
 
-.tw-tag-dialog__hint {
+.tw-tag-dialog__hint,
+.tw-project-dialog__hint {
 	margin-top: 8px;
 	font-size: 12px;
 	color: var(--tw-text-faint);
 	line-height: 1.45;
 }
 
-.v-application .v-dialog .v-card .tw-tag-dialog__actions {
+.v-application .v-dialog .v-card .tw-tag-dialog__actions,
+.v-application .v-dialog .v-card .tw-project-dialog__actions {
 	padding: 12px 20px 16px !important;
 	align-items: center;
 }
 
-.tw-tag-dialog__actions .tw-btn[disabled] {
+.tw-tag-dialog__actions .tw-btn[disabled],
+.tw-project-dialog__actions .tw-btn[disabled] {
 	opacity: 0.45;
 	cursor: not-allowed;
 }

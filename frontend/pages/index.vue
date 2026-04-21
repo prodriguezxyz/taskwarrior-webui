@@ -14,6 +14,7 @@
 		</div>
 
 		<TagsIndex v-if="view === 'tags'" />
+		<ProjectsIndex v-else-if="view === 'projects'" />
 		<TaskList v-else :tasks="tasks" />
 	</div>
 </template>
@@ -23,6 +24,7 @@ import { defineComponent, computed, watch, ComputedRef, useStore, useContext } f
 import moment from 'moment';
 import TaskList from '../components/TaskList.vue';
 import TagsIndex from '../components/TagsIndex.vue';
+import ProjectsIndex from '../components/ProjectsIndex.vue';
 import { Task } from 'taskwarrior-lib';
 import { accessorType } from '../store';
 
@@ -73,6 +75,7 @@ export default defineComponent({
 		const pageTitle = computed(() => {
 			if (view.value === 'today') return 'Today';
 			if (view.value === 'tags') return 'Tags';
+			if (view.value === 'projects') return 'Projects';
 			if (tagFilter.value) return `#${tagFilter.value}`;
 			if (projectFilter.value) return projectFilter.value;
 			return 'Inbox';
@@ -81,6 +84,7 @@ export default defineComponent({
 		const pageIcon = computed(() => {
 			if (view.value === 'today') return 'mdi-calendar-today';
 			if (view.value === 'tags') return 'mdi-tag-multiple-outline';
+			if (view.value === 'projects') return 'mdi-folder-multiple-outline';
 			if (tagFilter.value) return 'mdi-tag-outline';
 			if (projectFilter.value) return 'mdi-folder-outline';
 			return 'mdi-inbox-outline';
@@ -89,6 +93,7 @@ export default defineComponent({
 		const pageIconTone = computed(() => {
 			if (view.value === 'today') return 'tw-page__icon--today';
 			if (view.value === 'tags') return 'tw-page__icon--tag';
+			if (view.value === 'projects') return '';
 			if (tagFilter.value) return 'tw-page__icon--tag';
 			if (projectFilter.value) return '';
 			return 'tw-page__icon--inbox';
@@ -109,6 +114,13 @@ export default defineComponent({
 				const set = new Set<string>();
 				for (const t of store.state.tasks) {
 					if (t.tags) for (const tg of t.tags) set.add(tg);
+				}
+				return set.size;
+			}
+			if (view.value === 'projects') {
+				const set = new Set<string>();
+				for (const t of store.state.tasks) {
+					if (t.project) set.add(t.project);
 				}
 				return set.size;
 			}
@@ -142,6 +154,7 @@ export default defineComponent({
 		return {
 			TaskList,
 			TagsIndex,
+			ProjectsIndex,
 			tasks,
 			projectFilter,
 			tagFilter,
