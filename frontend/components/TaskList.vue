@@ -8,8 +8,8 @@
 		/>
 		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
 
-		<div class="tw-toolbar">
-			<nav class="tw-tabs" role="tablist">
+		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter }">
+			<nav v-if="projectFilter" class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
 					:key="st"
@@ -396,17 +396,14 @@ export default defineComponent({
 			tagFilter.value.length > 0 || priorityFilter.value !== null
 		);
 
-		watch([projectFilter, tagFilter, priorityFilter], () => {
+		watch([tagFilter, priorityFilter], () => {
 			selected.value = [];
 		});
 
-		watch(view, v => {
-			if (v === 'today') {
-				status.value = 'today';
-			}
-			else if (status.value === 'today') {
-				status.value = 'pending';
-			}
+		// Scope owns the status: Today → 'today', Inbox → 'pending', Project → user-picked.
+		watch([view, projectFilter], ([v, pf]) => {
+			if (v === 'today') status.value = 'today';
+			else if (!pf) status.value = 'pending';
 			selected.value = [];
 		});
 
@@ -481,12 +478,13 @@ export default defineComponent({
 			return Array.isArray(bucket) ? bucket : (bucket?.value || []);
 		});
 
-		const groupBy = computed(() => {
-			if (status.value !== 'today' && status.value !== 'pending') return '';
+		const groupBy = computed((): string | undefined => {
+			if (!projectFilter.value) return undefined;
+			if (status.value !== 'today' && status.value !== 'pending') return undefined;
 			const bucket: any = (classifiedTasks as any)[status.value];
 			const arr: any[] = Array.isArray(bucket) ? bucket : (bucket?.value || []);
 			const groups = new Set(arr.map(t => t._group));
-			return groups.size > 1 ? '_group' : '';
+			return groups.size > 1 ? '_group' : undefined;
 		});
 
 		const refresh = () => {

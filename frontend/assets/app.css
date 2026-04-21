@@ -238,6 +238,18 @@ body { font-family: var(--tw-font); }
 	justify-content: center;
 }
 
+.v-icon.tw-page__icon {
+	color: var(--tw-text-muted) !important;
+}
+
+.v-icon.tw-page__icon--inbox {
+	color: var(--tw-accent) !important;
+}
+
+.v-icon.tw-page__icon--today {
+	color: var(--tw-st-today) !important;
+}
+
 .tw-page__spacer { flex: 1; }
 
 .tw-page__meta {
@@ -260,6 +272,26 @@ body { font-family: var(--tw-font); }
 	border-bottom: 1px solid var(--tw-border);
 	min-height: 48px;
 	flex-wrap: wrap;
+}
+
+/* No-tabs variant — slot the actions next to the page title (overlaps header) */
+.tw-toolbar--bare {
+	border-bottom: none;
+	min-height: 0;
+	justify-content: flex-end;
+	margin-top: -44px;
+	margin-bottom: 4px;
+	pointer-events: none;
+	position: relative;
+	z-index: 2;
+}
+
+.tw-toolbar--bare > * {
+	pointer-events: auto;
+}
+
+.tw-toolbar--bare .tw-toolbar__actions {
+	padding: 0;
 }
 
 .tw-toolbar__spacer { flex: 1 1 auto; min-width: 8px; }
@@ -535,6 +567,9 @@ body { font-family: var(--tw-font); }
 .tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__count--today {
 	color: var(--tw-st-today) !important;
 }
+
+/* Inbox entry — emerald icon on idle; default active treatment already uses accent */
+.tw-sidebar__icon--inbox { color: var(--tw-accent) !important; }
 
 /* Prominent "Add task" entry (top of sidebar) */
 .tw-sidebar__item--primary,

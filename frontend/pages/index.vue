@@ -3,6 +3,7 @@
 		<div class="tw-page">
 			<header class="tw-page__header">
 				<h1 class="tw-page__title">
+					<v-icon size="22" :class="['tw-page__icon', pageIconTone]">{{ pageIcon }}</v-icon>
 					{{ pageTitle }}
 					<span class="tw-page__count">{{ pendingCount }}</span>
 				</h1>
@@ -72,6 +73,18 @@ export default defineComponent({
 			return 'Inbox';
 		});
 
+		const pageIcon = computed(() => {
+			if (view.value === 'today') return 'mdi-calendar-today';
+			if (projectFilter.value) return 'mdi-folder-outline';
+			return 'mdi-inbox-outline';
+		});
+
+		const pageIconTone = computed(() => {
+			if (view.value === 'today') return 'tw-page__icon--today';
+			if (projectFilter.value) return '';
+			return 'tw-page__icon--inbox';
+		});
+
 		const pendingCount = computed(() => {
 			const base = store.state.tasks.filter((t: Task) => t.status === 'pending');
 			if (view.value === 'today') {
@@ -105,6 +118,8 @@ export default defineComponent({
 			projectFilter,
 			view,
 			pageTitle,
+			pageIcon,
+			pageIconTone,
 			pendingCount,
 			progress
 		};

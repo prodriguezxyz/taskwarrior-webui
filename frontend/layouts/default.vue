@@ -93,11 +93,11 @@
 
 				<button
 					type="button"
-					class="tw-sidebar__item"
+					class="tw-sidebar__item tw-sidebar__item--inbox"
 					:class="{ 'tw-sidebar__item--active': view === 'all' && !projectFilter }"
 					@click="selectInbox"
 				>
-					<v-icon size="16" class="tw-sidebar__icon">mdi-inbox-outline</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--inbox">mdi-inbox-outline</v-icon>
 					<span class="tw-sidebar__label">Inbox</span>
 					<span class="tw-sidebar__count">{{ totalPending }}</span>
 				</button>
@@ -108,7 +108,7 @@
 					:class="{ 'tw-sidebar__item--active': view === 'today' }"
 					@click="selectToday"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today">mdi-calendar-today-outline</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today">mdi-calendar-today</v-icon>
 					<span class="tw-sidebar__label">Today</span>
 					<span v-if="todayCount > 0" class="tw-sidebar__count tw-sidebar__count--today">{{ todayCount }}</span>
 				</button>
