@@ -25,17 +25,17 @@ import {
 	PropType,
 	ref,
 	useStore,
-	watch,
-} from "@nuxtjs/composition-api";
-import { accessorType } from "../store";
+	watch
+} from '@nuxtjs/composition-api';
+import { accessorType } from '../store';
 
 export default defineComponent({
 	props: {
 		value: Boolean,
 		activeColumns: {
 			type: Array as PropType<Array<{ text: string; value: string }>>,
-			required: true,
-		},
+			required: true
+		}
 	},
 
 	setup(props, ctx) {
@@ -43,7 +43,7 @@ export default defineComponent({
 
 		const showDialog = computed({
 			get: () => props.value,
-			set: (val) => ctx.emit("input", val),
+			set: (val) => ctx.emit('input', val)
 		});
 
 		const closeDialog = () => {
@@ -51,14 +51,14 @@ export default defineComponent({
 		};
 		const hiddenColumnsBuffer = ref([...store.state.hiddenColumns]);
 		watch(hiddenColumnsBuffer, (v) => {
-			store.dispatch("updateHiddenColumns", v);
+			store.dispatch('updateHiddenColumns', v);
 		});
 
 		return {
 			hiddenColumnsBuffer,
 			showDialog,
-			closeDialog,
+			closeDialog
 		};
-	},
+	}
 });
 </script>
