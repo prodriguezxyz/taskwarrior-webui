@@ -88,7 +88,7 @@ export default defineComponent({
 		const openTime = async () => {
 			timeActive.value = true;
 			await nextTick();
-			const el = timeInputRef.value;
+			const el = timeInputRef.value as any;
 			if (el) {
 				el.focus();
 				if (typeof el.showPicker === 'function') {
