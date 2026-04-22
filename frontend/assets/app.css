@@ -1458,6 +1458,69 @@ body { font-family: var(--tw-font); }
 	cursor: pointer;
 }
 
+/* Complete-circle button (Todoist-style) */
+.v-application .tw-th--compact { padding: 0 8px !important; width: 36px !important; }
+.v-application .tw-td--compact { padding: 0 8px !important; width: 36px !important; }
+
+.tw-complete {
+	appearance: none;
+	background: transparent;
+	border: none;
+	padding: 0;
+	width: 22px;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	position: relative;
+	cursor: pointer;
+	transition: color 120ms ease, background 120ms ease;
+}
+
+.v-application .tw-complete .tw-complete__icon {
+	color: var(--tw-text-faint) !important;
+	transition: color 120ms ease, opacity 120ms ease;
+}
+
+.v-application .tw-complete .tw-complete__hover-icon {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: var(--tw-accent) !important;
+	opacity: 0;
+	transition: opacity 120ms ease;
+	pointer-events: none;
+}
+
+.tw-complete:hover .tw-complete__icon {
+	opacity: 0;
+}
+
+.tw-complete:hover .tw-complete__hover-icon {
+	opacity: 1;
+}
+
+/* Completed/deleted/recurring variants — no hover swap, just color */
+.v-application .tw-complete--done .tw-complete__icon { color: var(--tw-st-completed) !important; }
+.v-application .tw-complete--deleted .tw-complete__icon { color: var(--tw-st-deleted) !important; }
+.v-application .tw-complete--recurring .tw-complete__icon { color: var(--tw-st-recurring) !important; }
+
+.tw-complete--done:hover .tw-complete__icon,
+.tw-complete--deleted:hover .tw-complete__icon,
+.tw-complete--recurring:hover .tw-complete__icon { opacity: 1; }
+
+.tw-complete--done .tw-complete__hover-icon,
+.tw-complete--deleted .tw-complete__hover-icon,
+.tw-complete--recurring .tw-complete__hover-icon { display: none; }
+
+/* Selected row highlight (replaces v-data-table's built-in show-select highlight) */
+.v-application .tw-table tbody tr.tw-row--selected td {
+	background: var(--tw-surface-hover) !important;
+	box-shadow: inset 2px 0 0 var(--tw-accent);
+}
+
 /* Row action icons */
 .v-application .tw-table td:last-child .v-icon {
 	color: var(--tw-text-faint) !important;

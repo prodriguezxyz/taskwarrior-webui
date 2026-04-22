@@ -6,7 +6,7 @@
 			:text="confirmation.text"
 			@yes="confirmation.handler"
 		/>
-		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
+		<ColumnDialog v-model="showColumnDialog" :active-columns="configurableHeaders" />
 
 		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter }">
 			<nav v-if="projectFilter || sidebarTagFilter" class="tw-tabs" role="tablist">
@@ -160,13 +160,12 @@
 			<v-data-table
 				:items="currentItems"
 				:headers="filteredHeaders"
-				show-select
 				item-key="uuid"
 				:item-class="rowClass"
 				:group-by="groupBy"
-				v-model="selected"
 				class="tw-table"
 				style="width: 100%"
+				@click:row="onRowClick"
 			>
 				<template v-slot:group.header="{ group, items, isOpen, toggle, headers: hdrs }">
 					<tr class="v-row-group__header tw-group-row">
@@ -183,6 +182,19 @@
 							</button>
 						</td>
 					</tr>
+				</template>
+
+				<template v-slot:item._complete="{ item }">
+					<button
+						type="button"
+						class="tw-complete"
+						:class="completeBtnClass(item)"
+						:title="completeBtnTitle(item)"
+						@click="onCompleteClick($event, item)"
+					>
+						<v-icon size="18" class="tw-complete__icon">{{ completeBtnIcon(item) }}</v-icon>
+						<v-icon size="14" class="tw-complete__hover-icon">mdi-check</v-icon>
+					</button>
 				</template>
 
 				<template v-slot:item.description="{ item }">
@@ -224,27 +236,9 @@
 
 				<template v-slot:item.actions="{ item }">
 					<v-icon
-						v-show="status === 'pending' || status === 'today'"
-						size="20px"
-						class="ml-2"
-						@click="completeTasks([item])"
-						title="Done"
-					>
-						mdi-check
-					</v-icon>
-					<v-icon
-						v-show="status === 'completed' || status === 'deleted'"
-						size="20px"
-						class="ml-2"
-						@click="restoreTasks([item])"
-						title="Restore"
-					>
-						mdi-restore
-					</v-icon>
-					<v-icon
 						class="ml-2"
 						size="20px"
-						@click="editTask(item)"
+						@click="onActionClick($event, () => editTask(item))"
 						title="Edit"
 					>
 						mdi-pencil
@@ -253,7 +247,7 @@
 						v-show="status !== 'deleted'"
 						class="ml-2"
 						size="20px"
-						@click="deleteTasks([item])"
+						@click="onActionClick($event, () => deleteTasks([item]))"
 						title="Delete"
 					>
 						mdi-delete
@@ -365,6 +359,7 @@ export default defineComponent({
 			recurring: 'Recurring'
 		};
 		const headers = computed(() => [
+			{ text: '', value: '_complete', sortable: false, width: '36px', class: 'tw-th--compact', cellClass: 'tw-td--compact' },
 			{ text: 'Description', value: 'description' },
 			{ text: 'Project', value: 'project' },
 			{ text: 'Priority', value: 'priority' },
@@ -383,6 +378,10 @@ export default defineComponent({
 
 		const filteredHeaders = computed(() =>
 			headers.value.filter((v) => !store.state.hiddenColumns.includes(v.value))
+		);
+
+		const configurableHeaders = computed(() =>
+			headers.value.filter((v) => v.text !== '')
 		);
 
 		const showColumnDialog = ref(false);
@@ -530,10 +529,63 @@ export default defineComponent({
 			store.commit('openEditTaskDialog', _.cloneDeep(task));
 		};
 
+		const toggleSelection = (task: Task) => {
+			const idx = selected.value.findIndex(t => t.uuid === task.uuid);
+			if (idx >= 0) selected.value = selected.value.filter(t => t.uuid !== task.uuid);
+			else selected.value = [...selected.value, task];
+		};
+
+		const isMultiSelect = (event: MouseEvent) => event.ctrlKey || event.metaKey;
+
+		const onRowClick = (task: Task, _row: unknown, event: MouseEvent) => {
+			if (isMultiSelect(event)) toggleSelection(task);
+		};
+
 		const onDescriptionClick = (event: MouseEvent, task: Task) => {
+			if (isMultiSelect(event)) {
+				event.stopPropagation();
+				toggleSelection(task);
+				return;
+			}
 			const target = event.target as HTMLElement | null;
 			if (target && target.closest('a')) return;
+			event.stopPropagation();
 			editTask(task);
+		};
+
+		const onActionClick = (event: MouseEvent, action: () => void) => {
+			if (isMultiSelect(event)) return;
+			event.stopPropagation();
+			action();
+		};
+
+		const onCompleteClick = (event: MouseEvent, task: Task) => {
+			event.stopPropagation();
+			if (isMultiSelect(event)) {
+				toggleSelection(task);
+				return;
+			}
+			if (task.status === 'pending') completeTasks([task]);
+			else if (task.status === 'completed' || task.status === 'deleted') restoreTasks([task]);
+		};
+
+		const completeBtnIcon = (task: Task) => {
+			if (task.status === 'completed') return 'mdi-check-circle';
+			if (task.status === 'deleted') return 'mdi-delete-outline';
+			if (task.status === 'recurring') return 'mdi-restart';
+			return 'mdi-circle-outline';
+		};
+
+		const completeBtnClass = (task: Task) => ({
+			'tw-complete--done': task.status === 'completed',
+			'tw-complete--deleted': task.status === 'deleted',
+			'tw-complete--recurring': task.status === 'recurring'
+		});
+
+		const completeBtnTitle = (task: Task) => {
+			if (task.status === 'completed' || task.status === 'deleted') return 'Restore';
+			if (task.status === 'recurring') return 'Recurring task';
+			return 'Mark as done';
 		};
 
 		const completeTasks = async (tasks: Task[]) => {
@@ -582,13 +634,15 @@ export default defineComponent({
 		};
 
 		const rowClass = (item: Task) => {
+			const sel = selected.value.some(t => t.uuid === item.uuid) ? 'tw-row--selected' : '';
+			let base = '';
 			if (item.mask)
-				return 'recur-task';
+				base = 'recur-task';
 			else if (item.status !== 'completed' && urgentDate(item.due))
-				return 'urgent-task';
+				base = 'urgent-task';
 			else if (item.status !== 'completed' && expiredDate(item.due))
-				return 'expired-task';
-			return undefined;
+				base = 'expired-task';
+			return [base, sel].filter(Boolean).join(' ') || undefined;
 		};
 
 		const selectStatus = (st: string) => {
@@ -614,6 +668,7 @@ export default defineComponent({
 			refresh,
 			headers,
 			filteredHeaders,
+			configurableHeaders,
 			classifiedTasks,
 			groupBy,
 			status,
@@ -624,6 +679,12 @@ export default defineComponent({
 			syncTasks,
 			editTask,
 			onDescriptionClick,
+			onRowClick,
+			onActionClick,
+			onCompleteClick,
+			completeBtnIcon,
+			completeBtnClass,
+			completeBtnTitle,
 			deleteTasks,
 			completeTasks,
 			restoreTasks,
