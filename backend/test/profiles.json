@@ -1,0 +1,6 @@
+{
+  "profiles": [
+    { "name": "Personal", "taskrc": "./test/personal/.taskrc", "taskdata": "./test/personal/.task" },
+    { "name": "Trabajo",  "taskrc": "./test/work/.taskrc",     "taskdata": "./test/work/.task" }
+  ]
+}
