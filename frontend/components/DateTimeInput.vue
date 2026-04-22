@@ -258,6 +258,7 @@ export default defineComponent({
 	outline: none;
 	font-size: 14px;
 	background: transparent;
+	color: inherit;
 	font-family: inherit;
 	padding: 4px 0;
 }
@@ -274,5 +275,8 @@ export default defineComponent({
 
 .theme--dark .tw-datetime-time__toggle {
 	color: rgba(255, 255, 255, 0.7) !important;
+}
+.theme--dark .tw-datetime-time__input {
+	color-scheme: dark;
 }
 </style>
