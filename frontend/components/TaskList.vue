@@ -359,8 +359,8 @@ export default defineComponent({
 			recurring: 'Recurring'
 		};
 		const headers = computed(() => [
-			{ text: 'Project', value: 'project' },
 			{ text: 'Description', value: 'description' },
+			{ text: 'Project', value: 'project' },
 			{ text: 'Priority', value: 'priority' },
 			{ text: 'Scheduled', value: 'scheduled' },
 			...(status.value === 'recurring'
