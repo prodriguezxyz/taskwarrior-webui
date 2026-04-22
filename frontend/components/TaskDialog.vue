@@ -120,9 +120,6 @@
 				<v-btn text @click="closeDialog" width="80px">
 					Cancel
 				</v-btn>
-				<v-btn @click="reset" width="80px">
-					Reset
-				</v-btn>
 				<v-btn color="primary" @click="submit" width="80px">
 					Submit
 				</v-btn>
@@ -257,7 +254,6 @@ export default defineComponent({
 			addAnnotationDescription,
 			addAnnotation,
 			closeDialog,
-			reset,
 			submit,
 			showDialog
 		};

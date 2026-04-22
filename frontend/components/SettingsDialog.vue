@@ -70,9 +70,6 @@
 				<v-btn text @click="closeDialog">
 					Cancel
 				</v-btn>
-				<v-btn @click="reset">
-					Reset
-				</v-btn>
 				<v-btn color="primary" @click="save">
 					Save
 				</v-btn>
@@ -139,7 +136,6 @@ export default defineComponent({
 			showDialog,
 			closeDialog,
 			save,
-			reset,
 			settings,
 			numberRules,
 			formRef
