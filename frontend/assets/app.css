@@ -996,6 +996,39 @@ body { font-family: var(--tw-font); }
 
 .tw-palette__clear .v-icon { color: inherit !important; }
 
+.tw-palette__toggle {
+	appearance: none;
+	background: transparent;
+	border: 1px solid var(--tw-border);
+	height: 24px;
+	padding: 0 8px;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	border-radius: var(--tw-radius-sm);
+	color: var(--tw-text-muted);
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+	flex-shrink: 0;
+	transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.tw-palette__toggle:hover {
+	background: var(--tw-surface-hover);
+	color: var(--tw-text);
+}
+
+.tw-palette__toggle--active {
+	background: var(--tw-surface-hover);
+	color: var(--tw-text);
+	border-color: var(--tw-text-muted);
+}
+
+.tw-palette__toggle .v-icon { color: inherit !important; }
+
+.tw-palette__toggle-label { line-height: 1; }
+
 .tw-palette__results {
 	overflow-y: auto;
 	padding: 4px;

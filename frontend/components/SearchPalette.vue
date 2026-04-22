@@ -20,7 +20,19 @@
 					@keydown.down.prevent="move(1)"
 					@keydown.up.prevent="move(-1)"
 					@keydown.enter.prevent="choose(results[activeIdx])"
+					@keydown.alt.a.prevent="includeArchived = !includeArchived"
 				/>
+				<button
+					type="button"
+					class="tw-palette__toggle"
+					:class="{ 'tw-palette__toggle--active': includeArchived }"
+					:title="includeArchived ? 'Searching active + archived (Alt+A)' : 'Search archived too (Alt+A)'"
+					:aria-pressed="includeArchived"
+					@click="includeArchived = !includeArchived"
+				>
+					<v-icon size="14">mdi-archive-outline</v-icon>
+					<span class="tw-palette__toggle-label">Archived</span>
+				</button>
 				<button
 					v-if="query"
 					type="button"
@@ -69,10 +81,11 @@
 			</div>
 
 			<div v-else class="tw-palette__hint">
-				<span>Type to search across all tasks</span>
+				<span>{{ includeArchived ? 'Searching active + archived tasks' : 'Searching active tasks' }}</span>
 				<span class="tw-palette__hint-keys">
 					<kbd>↑</kbd><kbd>↓</kbd> navigate
 					<kbd>↵</kbd> open
+					<kbd>Alt</kbd>+<kbd>A</kbd> archived
 					<kbd>Esc</kbd> close
 				</span>
 			</div>
@@ -118,6 +131,7 @@ export default defineComponent({
 
 		const query = ref('');
 		const activeIdx = ref(0);
+		const includeArchived = ref(false);
 		const inputRef = ref<HTMLInputElement | null>(null);
 
 		const results = computed((): Task[] => {
@@ -125,7 +139,7 @@ export default defineComponent({
 			if (!q) return [];
 			const matches: Task[] = [];
 			for (const task of store.state.tasks) {
-				if (task.status === 'deleted') continue;
+				if (!includeArchived.value && (task.status === 'completed' || task.status === 'deleted')) continue;
 				const hay = [
 					task.description,
 					task.project,
@@ -154,12 +168,17 @@ export default defineComponent({
 			if (val) {
 				query.value = '';
 				activeIdx.value = 0;
+				includeArchived.value = false;
 				await nextTick();
 				inputRef.value?.focus();
 			}
 		});
 
 		watch(query, () => {
+			activeIdx.value = 0;
+		});
+
+		watch(includeArchived, () => {
 			activeIdx.value = 0;
 		});
 
@@ -212,6 +231,7 @@ export default defineComponent({
 			open,
 			query,
 			activeIdx,
+			includeArchived,
 			results,
 			inputRef,
 			close,
