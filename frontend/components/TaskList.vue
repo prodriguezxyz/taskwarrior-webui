@@ -163,6 +163,8 @@
 				item-key="uuid"
 				:item-class="rowClass"
 				:group-by="groupBy"
+				:items-per-page="20"
+				:footer-props="{ 'items-per-page-options': [10, 20, 50, 100, -1] }"
 				class="tw-table"
 				style="width: 100%"
 				@click:row="onRowClick"
