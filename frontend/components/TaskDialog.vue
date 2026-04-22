@@ -21,8 +21,10 @@
 					<v-combobox
 						v-model="formData.project"
 						:items="projects"
+						:search-input.sync="projectSearch"
 						hide-selected
 						label="Project"
+						@keydown.enter.native.capture="onProjectEnter"
 					/>
 					<v-combobox
 						v-model="formData.tags"
@@ -157,6 +159,22 @@ export default defineComponent({
 		];
 
 		const addAnnotationDescription = ref('');
+		const projectSearch = ref<string | null>('');
+
+		const onProjectEnter = (e: KeyboardEvent) => {
+			const search = (projectSearch.value || '').trim();
+			if (!search) return;
+			const searchLower = search.toLowerCase();
+			const matches = (projects.value as string[]).filter(
+				p => p.toLowerCase().includes(searchLower)
+			);
+			if (matches.length === 1 && matches[0].toLowerCase() !== searchLower) {
+				e.preventDefault();
+				e.stopPropagation();
+				formData.value.project = matches[0];
+				projectSearch.value = matches[0];
+			}
+		};
 
 		const recur = ref(Boolean(props.task?.recur));
 		const formData = ref({
@@ -255,7 +273,9 @@ export default defineComponent({
 			addAnnotation,
 			closeDialog,
 			submit,
-			showDialog
+			showDialog,
+			projectSearch,
+			onProjectEnter
 		};
 	}
 });
