@@ -8,8 +8,8 @@
 		/>
 		<ColumnDialog v-model="showColumnDialog" :active-columns="headers" />
 
-		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !tagFilter }">
-			<nav v-if="projectFilter || tagFilter" class="tw-tabs" role="tablist">
+		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter }">
+			<nav v-if="projectFilter || sidebarTagFilter" class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
 					:key="st"
