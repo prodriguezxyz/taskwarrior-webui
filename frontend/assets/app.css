@@ -1443,6 +1443,21 @@ body { font-family: var(--tw-font); }
 .v-application .tw-table .v-chip::before,
 .v-application .tw-table .v-chip::after { display: none !important; }
 
+/* Clickable description cell */
+.tw-description--clickable {
+	cursor: pointer;
+	display: inline-block;
+	width: 100%;
+}
+
+.tw-description--clickable:hover {
+	color: var(--tw-accent);
+}
+
+.tw-description--clickable a {
+	cursor: pointer;
+}
+
 /* Row action icons */
 .v-application .tw-table td:last-child .v-icon {
 	color: var(--tw-text-faint) !important;

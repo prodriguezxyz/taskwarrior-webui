@@ -186,7 +186,13 @@
 				</template>
 
 				<template v-slot:item.description="{ item }">
-					<span v-html="linkify(item.description)" />
+					<span
+						class="tw-description tw-description--clickable"
+						title="Edit task"
+						@click="onDescriptionClick($event, item)"
+					>
+						<span v-html="linkify(item.description)" />
+					</span>
 				</template>
 
 				<template v-if="status === 'waiting'" v-slot:item.wait="{ item }">
@@ -524,6 +530,12 @@ export default defineComponent({
 			store.commit('openEditTaskDialog', _.cloneDeep(task));
 		};
 
+		const onDescriptionClick = (event: MouseEvent, task: Task) => {
+			const target = event.target as HTMLElement | null;
+			if (target && target.closest('a')) return;
+			editTask(task);
+		};
+
 		const completeTasks = async (tasks: Task[]) => {
 			await store.dispatch('updateTasks', tasks.map(task => {
 				return {
@@ -611,6 +623,7 @@ export default defineComponent({
 			showSyncBtn,
 			syncTasks,
 			editTask,
+			onDescriptionClick,
 			deleteTasks,
 			completeTasks,
 			restoreTasks,
