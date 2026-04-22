@@ -29,11 +29,13 @@
 					<v-combobox
 						v-model="formData.tags"
 						:items="tags"
+						:search-input.sync="tagsSearch"
 						hide-selected
 						small-chips
 						multiple
 						label="Tags"
 						hint="Press tab or enter to add new tags"
+						@keydown.enter.native.capture="onTagsEnter"
 					/>
 					<v-row class="px-3">
 						<DateTimeInput
@@ -176,6 +178,23 @@ export default defineComponent({
 			}
 		};
 
+		const tagsSearch = ref<string | null>('');
+		const onTagsEnter = (e: KeyboardEvent) => {
+			const search = (tagsSearch.value || '').trim();
+			if (!search) return;
+			const searchLower = search.toLowerCase();
+			const currentTags = (formData.value.tags || []) as string[];
+			const matches = (tags.value as string[]).filter(
+				t => t.toLowerCase().includes(searchLower) && !currentTags.includes(t)
+			);
+			if (matches.length === 1 && matches[0].toLowerCase() !== searchLower) {
+				e.preventDefault();
+				e.stopPropagation();
+				formData.value.tags = [...currentTags, matches[0]];
+				tagsSearch.value = null;
+			}
+		};
+
 		const recur = ref(Boolean(props.task?.recur));
 		const formData = ref({
 			description: '',
@@ -275,7 +294,9 @@ export default defineComponent({
 			submit,
 			showDialog,
 			projectSearch,
-			onProjectEnter
+			onProjectEnter,
+			tagsSearch,
+			onTagsEnter
 		};
 	}
 });
