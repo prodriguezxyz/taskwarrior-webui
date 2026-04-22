@@ -8,13 +8,13 @@
 		>
 			<template v-slot:activator="{ attrs }">
 				<v-text-field
-					:value="value"
-					@input="v => $emit('input', v)"
+					:value="displayValue"
 					:label="label"
 					:required="required"
 					:rules="rules"
+					readonly
 					prepend-inner-icon="mdi-calendar-blank-outline"
-					@click:prepend-inner="menu = true"
+					@click="menu = true"
 					v-bind="attrs"
 				/>
 			</template>
@@ -69,7 +69,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, nextTick } from '@nuxtjs/composition-api';
+import { defineComponent, ref, watch, computed, nextTick } from '@nuxtjs/composition-api';
 import moment from 'moment';
 
 export default defineComponent({
@@ -102,19 +102,33 @@ export default defineComponent({
 
 		const parseDate = (str: string): moment.Moment | null => {
 			if (!str) return null;
+			const twUtc = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(str);
+			if (twUtc) {
+				const iso = `${twUtc[1]}-${twUtc[2]}-${twUtc[3]}T${twUtc[4]}:${twUtc[5]}:${twUtc[6]}Z`;
+				const m = moment(iso);
+				return m.isValid() ? m : null;
+			}
 			const m = moment(str, [
 				moment.ISO_8601,
-				'YYYYMMDD[T]HHmmss[Z]',
 				'YYYYMMDD[T]HHmmss',
 				'YYYY-MM-DD HH:mm:ss',
 				'YYYY-MM-DD HH:mm',
 				'YYYY-MM-DD',
 				'YYYY/MM/DD',
+				'DD/MM/YYYY HH:mm',
 				'DD/MM/YYYY',
 				'MM/DD/YYYY'
 			], true);
 			return m.isValid() ? m : null;
 		};
+
+		const displayValue = computed(() => {
+			const m = parseDate(props.value);
+			if (!m) return props.value || '';
+			return props.showTime
+				? m.local().format('DD/MM/YYYY HH:mm')
+				: m.local().format('DD/MM/YYYY');
+		});
 
 		const draftDate = ref<string | null>(null);
 		const draftTime = ref<string>('');
@@ -162,7 +176,7 @@ export default defineComponent({
 			menu.value = false;
 		};
 
-		return { menu, timeActive, timeInputRef, draftDate, draftTime, openTime, apply, clear };
+		return { menu, timeActive, timeInputRef, draftDate, draftTime, displayValue, openTime, apply, clear };
 	}
 });
 </script>
