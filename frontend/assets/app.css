@@ -181,20 +181,67 @@ body { font-family: var(--tw-font); }
 }
 
 .tw-profile-select .v-input__slot {
-	min-height: 32px !important;
-	border: 1px solid var(--tw-border) !important;
+	min-height: 34px !important;
 	border-radius: var(--tw-radius-sm) !important;
-	background: var(--tw-bg) !important;
+	background: var(--tw-surface) !important;
+	border: 1px solid var(--tw-border) !important;
 	padding: 0 8px !important;
 	box-shadow: none !important;
+	cursor: pointer !important;
+	transition: background 120ms ease, border-color 120ms ease;
+}
+
+.tw-profile-select .v-input__slot:hover {
+	background: var(--tw-surface-hover) !important;
+	border-color: var(--tw-border-strong) !important;
 }
 
 .tw-profile-select .v-input__slot::before,
 .tw-profile-select .v-input__slot::after { display: none !important; }
 
+.tw-profile-select .v-select__selections {
+	flex-wrap: nowrap;
+	min-width: 0;
+	overflow: hidden;
+}
+
 .tw-profile-select .v-select__selection {
 	color: var(--tw-text) !important;
 	font-size: 13px !important;
+	font-weight: 600;
+	letter-spacing: -0.005em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+
+.tw-profile-select .v-input__prepend-inner {
+	margin-top: 0 !important;
+	padding-right: 8px !important;
+	align-self: center;
+}
+
+.tw-profile-select .v-input__prepend-inner .v-icon {
+	color: var(--tw-text-muted) !important;
+	font-size: 16px !important;
+}
+
+.tw-profile-select .v-input__append-inner {
+	margin-top: 0 !important;
+	padding-left: 4px !important;
+	align-self: center;
+}
+
+.tw-profile-select .v-input__append-inner .v-icon {
+	color: var(--tw-text-faint) !important;
+	font-size: 14px !important;
+}
+
+.tw-profile-menu {
+	border: 1px solid var(--tw-border) !important;
+	border-radius: var(--tw-radius-sm) !important;
+	box-shadow: var(--tw-shadow-md) !important;
 }
 
 /* ============================================================
@@ -478,6 +525,10 @@ body { font-family: var(--tw-font); }
 	background: var(--tw-bg) !important;
 	border-right: 1px solid var(--tw-border) !important;
 	box-shadow: none !important;
+}
+
+.tw-sidebar__header {
+	padding: 10px 10px 0;
 }
 
 .tw-sidebar__nav {

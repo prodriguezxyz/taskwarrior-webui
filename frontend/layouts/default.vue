@@ -32,18 +32,6 @@
 
 			<v-spacer />
 
-			<v-select
-				v-if="profiles.length > 1"
-				:items="profiles.map(p => p.name)"
-				v-model="currentProfile"
-				dense
-				hide-details
-				solo
-				flat
-				class="tw-profile-select mr-2"
-				style="max-width: 160px"
-			/>
-
 			<div
 				class="tw-icon-btn"
 				role="button"
@@ -68,6 +56,22 @@
 		</v-app-bar>
 
 		<v-navigation-drawer app permanent width="240" class="tw-sidebar" :mini-variant="false">
+			<div v-if="profiles.length > 1" class="tw-sidebar__header">
+				<v-select
+					:items="profiles.map(p => p.name)"
+					v-model="currentProfile"
+					dense
+					hide-details
+					solo
+					flat
+					prepend-inner-icon="mdi-account-circle-outline"
+					append-icon="mdi-unfold-more-horizontal"
+					class="tw-profile-select"
+					:menu-props="{ offsetY: true, contentClass: 'tw-profile-menu' }"
+					aria-label="Switch profile"
+				/>
+			</div>
+
 			<nav class="tw-sidebar__nav">
 				<button
 					type="button"
