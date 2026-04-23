@@ -19,6 +19,7 @@
 						required
 					/>
 					<v-combobox
+						ref="projectComboRef"
 						v-model="formData.project"
 						:items="projects"
 						:search-input.sync="projectSearch"
@@ -32,6 +33,7 @@
 						:search-input.sync="tagsSearch"
 						hide-selected
 						small-chips
+						deletable-chips
 						multiple
 						label="Tags"
 						hint="Press tab or enter to add new tags"
@@ -162,6 +164,7 @@ export default defineComponent({
 
 		const addAnnotationDescription = ref('');
 		const projectSearch = ref<string | null>('');
+		const projectComboRef = ref<any>(null);
 
 		const onProjectEnter = (e: KeyboardEvent) => {
 			const search = (projectSearch.value || '').trim();
@@ -175,6 +178,7 @@ export default defineComponent({
 				e.stopPropagation();
 				formData.value.project = matches[0];
 				projectSearch.value = matches[0];
+				projectComboRef.value?.blur();
 			}
 		};
 
@@ -294,6 +298,7 @@ export default defineComponent({
 			submit,
 			showDialog,
 			projectSearch,
+			projectComboRef,
 			onProjectEnter,
 			tagsSearch,
 			onTagsEnter
