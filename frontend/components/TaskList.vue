@@ -408,10 +408,10 @@ export default defineComponent({
 			selected.value = [];
 		});
 
-		// Scope owns the status: Today → 'today', Inbox → 'pending', Project/Tag → user-picked.
-		watch([view, projectFilter, sidebarTagFilter], ([v, pf, tf]) => {
-			if (v === 'today') status.value = 'today';
-			else if (!pf && !tf) status.value = 'pending';
+		// Scope owns the status: Today → 'today', everything else → 'pending'.
+		// Switching project/tag in the sidebar always lands on pending.
+		watch([view, projectFilter, sidebarTagFilter], ([v]) => {
+			status.value = v === 'today' ? 'today' : 'pending';
 			selected.value = [];
 		});
 
