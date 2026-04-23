@@ -3,6 +3,7 @@
 		<SettingsDialog v-model="settingsDialog" />
 		<TaskDialog :value="taskDialogOpen" :task="taskDialogTask || undefined" @input="onTaskDialogInput" />
 		<SearchPalette />
+		<QuickAddPalette />
 		<ProjectManageDialog v-model="projectDialogOpen" :project="projectDialogName" />
 
 		<v-snackbar
@@ -76,11 +77,12 @@
 				<button
 					type="button"
 					class="tw-sidebar__item tw-sidebar__item--primary"
-					title="New task"
+					title="New task (q)"
 					@click="openNewTask"
 				>
 					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--primary">mdi-plus-circle</v-icon>
 					<span class="tw-sidebar__label">Add task</span>
+					<span class="tw-sidebar__shortcut">q</span>
 				</button>
 
 				<button
@@ -179,6 +181,7 @@ import moment from 'moment';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 import SearchPalette from '../components/SearchPalette.vue';
+import QuickAddPalette from '../components/QuickAddPalette.vue';
 import ProjectManageDialog from '../components/ProjectManageDialog.vue';
 import { accessorType } from '../store';
 
@@ -280,8 +283,9 @@ export default defineComponent({
 			if (!val) store.commit('closeTaskDialog');
 		};
 
-		const openNewTask = () => store.commit('openNewTaskDialog');
+		const openNewTask = () => store.commit('setQuickAddOpen', true);
 		const openSearch = () => store.commit('setSearchOpen', true);
+		const openQuickAdd = () => store.commit('setQuickAddOpen', true);
 
 		const projectDialogOpen = ref(false);
 		const projectDialogName = ref('');
@@ -293,13 +297,15 @@ export default defineComponent({
 		const onGlobalKeydown = (e: KeyboardEvent) => {
 			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
 			const isSlash = e.key === '/';
-			if (!isCtrlK && !isSlash) return;
-			if (isSlash) {
+			const isQ = e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.altKey;
+			if (!isCtrlK && !isSlash && !isQ) return;
+			if (isSlash || isQ) {
 				const t = e.target as HTMLElement | null;
 				if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
 			}
 			e.preventDefault();
-			openSearch();
+			if (isQ) openQuickAdd();
+			else openSearch();
 		};
 
 		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
@@ -365,6 +371,7 @@ export default defineComponent({
 			onTaskDialogInput,
 			openNewTask,
 			openSearch,
+			openQuickAdd,
 
 			projectDialogOpen,
 			projectDialogName,
@@ -373,6 +380,7 @@ export default defineComponent({
 			SettingsDialog,
 			TaskDialog,
 			SearchPalette,
+			QuickAddPalette,
 			ProjectManageDialog
 		};
 	}

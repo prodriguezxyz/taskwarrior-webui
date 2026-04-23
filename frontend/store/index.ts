@@ -22,6 +22,7 @@ export const state = () => ({
 	tagFilter: null as string | null,
 	view: 'all' as 'all' | 'today' | 'tags' | 'projects',
 	searchOpen: false,
+	quickAddOpen: false,
 	taskDialog: {
 		open: false,
 		task: null as Task | null
@@ -83,6 +84,10 @@ export const mutations: MutationTree<RootState> = {
 
 	setSearchOpen(state, value: boolean) {
 		state.searchOpen = value;
+	},
+
+	setQuickAddOpen(state, value: boolean) {
+		state.quickAddOpen = value;
 	},
 
 	openNewTaskDialog(state) {

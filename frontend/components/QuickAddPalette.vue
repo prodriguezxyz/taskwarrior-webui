@@ -1,0 +1,366 @@
+<template>
+	<v-dialog
+		v-model="open"
+		max-width="640"
+		content-class="tw-palette__dialog"
+		transition="fade-transition"
+		@keydown.esc="close"
+	>
+		<div class="tw-palette tw-quickadd" role="dialog" aria-label="Add task">
+			<div class="tw-palette__inputwrap">
+				<v-icon size="18" class="tw-palette__icon">mdi-plus-circle-outline</v-icon>
+				<input
+					ref="inputRef"
+					v-model="text"
+					type="text"
+					class="tw-palette__input"
+					placeholder="Buy milk #shopping @errands tomorrow p2"
+					autocomplete="off"
+					spellcheck="false"
+					@keydown.down.prevent="onDown"
+					@keydown.up.prevent="onUp"
+					@keydown.tab.prevent="onTab"
+					@keydown.enter.prevent="onEnter"
+					@keyup="syncCursor"
+					@click="syncCursor"
+					@select="syncCursor"
+				/>
+			</div>
+
+			<div v-if="suggestions.length" class="tw-palette__results" role="listbox">
+				<button
+					v-for="(s, i) in suggestions"
+					:key="s"
+					type="button"
+					role="option"
+					:aria-selected="i === activeIdx"
+					class="tw-palette__item"
+					:class="{ 'tw-palette__item--active': i === activeIdx }"
+					@mouseenter="activeIdx = i"
+					@mousedown.prevent="applySuggestion(s)"
+				>
+					<v-icon size="14" class="tw-palette__item-icon">
+						{{ suggestionType === 'project' ? 'mdi-folder-outline' : 'mdi-tag-outline' }}
+					</v-icon>
+					<span class="tw-palette__item-desc">{{ s }}</span>
+				</button>
+			</div>
+
+			<div v-if="hasParsedMeta" class="tw-quickadd__preview">
+				<span v-if="parsed.project" class="tw-quickadd__chip">
+					<v-icon size="12">mdi-folder-outline</v-icon>
+					{{ parsed.project }}
+				</span>
+				<span
+					v-for="t in parsed.tags"
+					:key="'tag-' + t"
+					class="tw-quickadd__chip"
+				>
+					<v-icon size="12">mdi-tag-outline</v-icon>
+					{{ t }}
+				</span>
+				<span
+					v-if="parsed.priority"
+					class="tw-quickadd__chip"
+					:class="'tw-quickadd__chip--p' + parsed.priority"
+				>
+					P{{ parsed.priority }}
+				</span>
+				<span v-if="parsed.due" class="tw-quickadd__chip">
+					<v-icon size="12">mdi-calendar</v-icon>
+					{{ displayDate(parsed.due) }}
+				</span>
+			</div>
+
+			<div class="tw-palette__hint">
+				<span class="tw-palette__hint-keys">
+					<kbd>#</kbd>project
+					<kbd>@</kbd>tag
+					<kbd>p1-p4</kbd>
+					<kbd>today</kbd>
+					<kbd>tomorrow</kbd>
+					<kbd>mon-sun</kbd>
+					<kbd>+3d</kbd>
+				</span>
+				<span class="tw-palette__hint-keys">
+					<kbd>↵</kbd>
+					add
+					<kbd>Esc</kbd>
+					close
+				</span>
+			</div>
+		</div>
+	</v-dialog>
+</template>
+
+<script lang="ts">
+import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxtjs/composition-api';
+import moment from 'moment';
+import { accessorType } from '../store';
+
+const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
+	'1': 'H',
+	'2': 'M',
+	'3': 'L',
+	'4': undefined
+};
+
+const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function parseDateToken(tok: string): string | undefined {
+	const lower = tok.toLowerCase();
+	if (lower === 'today') return moment().endOf('day').toISOString();
+	if (lower === 'tomorrow' || lower === 'tom') return moment().add(1, 'day').endOf('day').toISOString();
+
+	const dayIdx = DAY_NAMES.indexOf(lower);
+	if (dayIdx !== -1) {
+		const result = moment();
+		const todayDow = result.day();
+		let diff = dayIdx - todayDow;
+		if (diff <= 0) diff += 7;
+		return result.add(diff, 'day').endOf('day').toISOString();
+	}
+
+	const relMatch = /^\+(\d+)([dw])$/.exec(lower);
+	if (relMatch) {
+		const n = parseInt(relMatch[1], 10);
+		const unit = relMatch[2] === 'd' ? 'days' : 'weeks';
+		return moment().add(n, unit).endOf('day').toISOString();
+	}
+
+	if (/^\d{4}-\d{2}-\d{2}$/.test(lower)) {
+		const m = moment(lower, 'YYYY-MM-DD', true);
+		if (m.isValid()) return m.endOf('day').toISOString();
+	}
+
+	return undefined;
+}
+
+interface Parsed {
+	description: string;
+	project?: string;
+	tags: string[];
+	priority?: 'H' | 'M' | 'L';
+	due?: string;
+}
+
+function parseQuickAdd(input: string): Parsed {
+	const out: Parsed = { description: '', tags: [] };
+	const tokens = input.split(/\s+/);
+	const remaining: string[] = [];
+
+	for (const tok of tokens) {
+		if (!tok) continue;
+		const proj = /^#([\p{L}\p{N}_.-]+)$/u.exec(tok);
+		if (proj) {
+			out.project = proj[1];
+			continue;
+		}
+		const tag = /^@([\p{L}\p{N}_-]+)$/u.exec(tok);
+		if (tag) {
+			if (!out.tags.includes(tag[1])) out.tags.push(tag[1]);
+			continue;
+		}
+		const pri = /^p([1-4])$/i.exec(tok);
+		if (pri) {
+			out.priority = PRIORITY_MAP[pri[1]];
+			continue;
+		}
+		const due = parseDateToken(tok);
+		if (due) {
+			out.due = due;
+			continue;
+		}
+		remaining.push(tok);
+	}
+
+	out.description = remaining.join(' ').trim();
+	return out;
+}
+
+function displayDate(str?: string) {
+	if (!str) return '';
+	const date = moment(str);
+	const diff = moment.duration(date.diff(moment()));
+	if (Math.abs(diff.asDays()) < 1) return diff.humanize(true);
+	return date.format('YYYY-MM-DD');
+}
+
+export default defineComponent({
+	setup() {
+		const store = useStore<typeof accessorType>();
+
+		const open = computed({
+			get: () => store.state.quickAddOpen,
+			set: val => store.commit('setQuickAddOpen', val)
+		});
+
+		const text = ref('');
+		const cursorPos = ref(0);
+		const activeIdx = ref(0);
+		const submitting = ref(false);
+		const inputRef = ref<HTMLInputElement | null>(null);
+
+		const projects = computed(() => {
+			const set = new Set<string>();
+			for (const p of store.getters.projects as string[]) {
+				if (p) set.add(p);
+			}
+			return Array.from(set).sort();
+		});
+
+		const tags = computed(() => store.getters.tags as string[]);
+
+		const currentToken = computed(() => {
+			const pos = cursorPos.value;
+			const before = text.value.slice(0, pos);
+			const m = /([#@])([\p{L}\p{N}_.-]*)$/u.exec(before);
+			if (!m) return null;
+			return {
+				sigil: m[1] as '#' | '@',
+				prefix: m[2],
+				start: pos - m[0].length
+			};
+		});
+
+		const suggestionType = computed(() => {
+			const t = currentToken.value;
+			if (!t) return null;
+			return t.sigil === '#' ? 'project' : 'tag';
+		});
+
+		const suggestions = computed((): string[] => {
+			const t = currentToken.value;
+			if (!t) return [];
+			const list = t.sigil === '#' ? projects.value : tags.value;
+			const prefix = t.prefix.toLowerCase();
+			const parsed = parseQuickAdd(text.value);
+			const used = t.sigil === '@' ? new Set(parsed.tags) : new Set<string>();
+			return list
+				.filter(item => {
+					if (used.has(item)) return false;
+					if (!prefix) return true;
+					return item.toLowerCase().includes(prefix);
+				})
+				.slice(0, 6);
+		});
+
+		const parsed = computed(() => parseQuickAdd(text.value));
+
+		const hasParsedMeta = computed(() =>
+			Boolean(parsed.value.project)
+			|| parsed.value.tags.length > 0
+			|| Boolean(parsed.value.priority)
+			|| Boolean(parsed.value.due)
+		);
+
+		watch(suggestions, () => {
+			activeIdx.value = 0;
+		});
+
+		watch(open, async val => {
+			if (val) {
+				text.value = '';
+				cursorPos.value = 0;
+				activeIdx.value = 0;
+				submitting.value = false;
+				await nextTick();
+				inputRef.value?.focus();
+			}
+		});
+
+		const syncCursor = () => {
+			const el = inputRef.value;
+			if (el) cursorPos.value = el.selectionStart ?? text.value.length;
+		};
+
+		const close = () => {
+			open.value = false;
+		};
+
+		const onDown = () => {
+			if (!suggestions.value.length) return;
+			activeIdx.value = (activeIdx.value + 1) % suggestions.value.length;
+		};
+
+		const onUp = () => {
+			const n = suggestions.value.length;
+			if (!n) return;
+			activeIdx.value = (activeIdx.value - 1 + n) % n;
+		};
+
+		const onTab = () => {
+			if (suggestions.value.length) applySuggestion(suggestions.value[activeIdx.value]);
+		};
+
+		const onEnter = () => {
+			if (suggestions.value.length) {
+				applySuggestion(suggestions.value[activeIdx.value]);
+				return;
+			}
+			submit();
+		};
+
+		const applySuggestion = (s: string) => {
+			const t = currentToken.value;
+			if (!t) return;
+			const before = text.value.slice(0, t.start);
+			const after = text.value.slice(cursorPos.value);
+			const insert = `${t.sigil}${s} `;
+			text.value = before + insert + after;
+			nextTick(() => {
+				const el = inputRef.value;
+				if (!el) return;
+				const newPos = t.start + insert.length;
+				el.focus();
+				el.setSelectionRange(newPos, newPos);
+				cursorPos.value = newPos;
+			});
+		};
+
+		const submit = async () => {
+			if (submitting.value) return;
+			const p = parsed.value;
+			if (!p.description) return;
+			submitting.value = true;
+			try {
+				await store.dispatch('updateTasks', [{
+					description: p.description,
+					project: p.project,
+					tags: p.tags.length ? p.tags : undefined,
+					priority: p.priority,
+					due: p.due,
+					annotations: []
+				}]);
+				store.commit('setNotification', {
+					color: 'success',
+					text: 'Task added'
+				});
+				close();
+			}
+			finally {
+				submitting.value = false;
+			}
+		};
+
+		return {
+			open,
+			text,
+			inputRef,
+			suggestions,
+			suggestionType,
+			activeIdx,
+			parsed,
+			hasParsedMeta,
+			displayDate,
+			close,
+			onDown,
+			onUp,
+			onTab,
+			onEnter,
+			applySuggestion,
+			syncCursor
+		};
+	}
+});
+</script>
