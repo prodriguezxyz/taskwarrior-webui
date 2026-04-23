@@ -5,6 +5,7 @@
 		<SearchPalette />
 		<QuickAddPalette />
 		<ProjectManageDialog v-model="projectDialogOpen" :project="projectDialogName" />
+		<ShortcutsHelp v-model="shortcutsOpen" />
 
 		<v-snackbar
 			v-model="snackbar"
@@ -176,13 +177,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref } from '@nuxtjs/composition-api';
+import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref, provide } from '@nuxtjs/composition-api';
 import moment from 'moment';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
 import SearchPalette from '../components/SearchPalette.vue';
 import QuickAddPalette from '../components/QuickAddPalette.vue';
 import ProjectManageDialog from '../components/ProjectManageDialog.vue';
+import ShortcutsHelp from '../components/ShortcutsHelp.vue';
 import { accessorType } from '../store';
 
 export default defineComponent({
@@ -294,22 +296,89 @@ export default defineComponent({
 			projectDialogOpen.value = true;
 		};
 
-		const onGlobalKeydown = (e: KeyboardEvent) => {
-			const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
-			const isSlash = e.key === '/';
-			const isQ = e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.altKey;
-			if (!isCtrlK && !isSlash && !isQ) return;
-			if (isSlash || isQ) {
-				const t = e.target as HTMLElement | null;
-				if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+		const shortcutsOpen = ref(false);
+		const settingsDialog = ref(false);
+
+		const isTypingTarget = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+		};
+
+		const anyDialogOpen = () =>
+			store.state.searchOpen
+			|| store.state.quickAddOpen
+			|| store.state.taskDialog.open
+			|| settingsDialog.value
+			|| projectDialogOpen.value
+			|| shortcutsOpen.value;
+
+		const layoutDialogsOpen = computed(() =>
+			settingsDialog.value || projectDialogOpen.value || shortcutsOpen.value
+		);
+		provide('layoutDialogsOpen', layoutDialogsOpen);
+
+		let gPending = false;
+		let gTimer: number | null = null;
+		const armG = () => {
+			gPending = true;
+			if (gTimer !== null) window.clearTimeout(gTimer);
+			gTimer = window.setTimeout(() => {
+				gPending = false; gTimer = null;
+			}, 800);
+		};
+		const disarmG = () => {
+			gPending = false;
+			if (gTimer !== null) {
+				window.clearTimeout(gTimer); gTimer = null;
 			}
-			e.preventDefault();
-			if (isQ) openQuickAdd();
-			else openSearch();
+		};
+
+		const onGlobalKeydown = (e: KeyboardEvent) => {
+			// Ctrl+K works everywhere (Linear/Slack idiom), even inside inputs.
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+				e.preventDefault();
+				openSearch();
+				return;
+			}
+
+			if (isTypingTarget(e.target)) return;
+			if (anyDialogOpen()) return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+			if (gPending) {
+				disarmG();
+				switch (e.key.toLowerCase()) {
+					case 'i': e.preventDefault(); selectInbox(); return;
+					case 't': e.preventDefault(); selectToday(); return;
+					case 'p': e.preventDefault(); selectProjectsIndex(); return;
+					case 'g': e.preventDefault(); selectTagsIndex(); return;
+				}
+				// Unknown continuation — fall through so the key still acts as a shortcut.
+			}
+
+			switch (e.key) {
+				case '/':
+					e.preventDefault(); openSearch(); return;
+				case 'q':
+				case 'a':
+					e.preventDefault(); openQuickAdd(); return;
+				case 'g':
+					e.preventDefault(); armG(); return;
+				case 's':
+					e.preventDefault(); store.dispatch('syncTasks'); return;
+				case 'r':
+					e.preventDefault(); store.dispatch('fetchTasks'); return;
+				case '?':
+					e.preventDefault(); shortcutsOpen.value = true;
+			}
 		};
 
 		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
-		onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown));
+		onBeforeUnmount(() => {
+			window.removeEventListener('keydown', onGlobalKeydown);
+			disarmG();
+		});
 
 		const dark = computed({
 			get: () => context.$vuetify.theme.dark,
@@ -317,8 +386,6 @@ export default defineComponent({
 				context.$vuetify.theme.dark = val;
 			}
 		});
-
-		const settingsDialog = ref(false);
 
 		const notification = computed(() => store.state.notification);
 		const snackbar = computed({
@@ -377,11 +444,14 @@ export default defineComponent({
 			projectDialogName,
 			manageProject,
 
+			shortcutsOpen,
+
 			SettingsDialog,
 			TaskDialog,
 			SearchPalette,
 			QuickAddPalette,
-			ProjectManageDialog
+			ProjectManageDialog,
+			ShortcutsHelp
 		};
 	}
 });

@@ -261,7 +261,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref, onMounted, onBeforeUnmount, nextTick, inject } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
 import ConfirmationDialog from '../components/ConfirmationDialog.vue';
@@ -635,8 +635,31 @@ export default defineComponent({
 			showConfirmationDialog.value = true;
 		};
 
+		const cursorUuid = ref<string | null>(null);
+
+		const cursorTask = computed((): Task | null => {
+			if (!cursorUuid.value) return null;
+			return currentItems.value.find(t => t.uuid === cursorUuid.value) || null;
+		});
+
+		const moveCursor = async (delta: number) => {
+			const items = currentItems.value;
+			if (!items.length) return;
+			const curIdx = cursorUuid.value
+				? items.findIndex(t => t.uuid === cursorUuid.value)
+				: -1;
+			const next = curIdx < 0
+				? (delta > 0 ? 0 : items.length - 1)
+				: Math.max(0, Math.min(items.length - 1, curIdx + delta));
+			cursorUuid.value = items[next].uuid || null;
+			await nextTick();
+			const el = document.querySelector('.tw-row--cursor') as HTMLElement | null;
+			if (el) el.scrollIntoView({ block: 'nearest' });
+		};
+
 		const rowClass = (item: Task) => {
 			const sel = selected.value.some(t => t.uuid === item.uuid) ? 'tw-row--selected' : '';
+			const cur = cursorUuid.value === item.uuid ? 'tw-row--cursor' : '';
 			let base = '';
 			if (item.mask)
 				base = 'recur-task';
@@ -644,7 +667,7 @@ export default defineComponent({
 				base = 'urgent-task';
 			else if (item.status !== 'completed' && expiredDate(item.due))
 				base = 'expired-task';
-			return [base, sel].filter(Boolean).join(' ') || undefined;
+			return [base, sel, cur].filter(Boolean).join(' ') || undefined;
 		};
 
 		const selectStatus = (st: string) => {
@@ -656,6 +679,70 @@ export default defineComponent({
 				status.value = st;
 			}
 		};
+
+		const isGridTypingTarget = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+		};
+
+		const layoutDialogsOpen = inject<Ref<boolean>>('layoutDialogsOpen', ref(false));
+
+		const isGridBlocked = () =>
+			showConfirmationDialog.value
+			|| showColumnDialog.value
+			|| store.state.searchOpen
+			|| store.state.quickAddOpen
+			|| store.state.taskDialog.open
+			|| layoutDialogsOpen.value;
+
+		const isActivatorTarget = (el: EventTarget | null) => {
+			if (!(el instanceof HTMLElement)) return false;
+			const tag = el.tagName;
+			return tag === 'BUTTON' || tag === 'A';
+		};
+
+		const GRID_KEYS = new Set(['j', 'k', 'e', 'x', ' ', 'Enter', 'ArrowUp', 'ArrowDown']);
+
+		const onGridKeydown = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			if (!GRID_KEYS.has(e.key)) return;
+			if (isGridTypingTarget(e.target)) return;
+			if (isGridBlocked()) return;
+
+			const cur = cursorTask.value;
+			const onActivator = isActivatorTarget(e.target);
+
+			switch (e.key) {
+				case 'j':
+				case 'ArrowDown':
+					e.preventDefault(); moveCursor(1); return;
+				case 'k':
+				case 'ArrowUp':
+					e.preventDefault(); moveCursor(-1); return;
+				case 'e':
+					if (!cur) return;
+					e.preventDefault(); editTask(cur); return;
+				case 'Enter':
+					// Enter natively activates focused buttons/links — don't double-fire.
+					if (onActivator) return;
+					if (!cur) return;
+					e.preventDefault(); editTask(cur); return;
+				case 'x':
+					if (!cur) return;
+					e.preventDefault(); toggleSelection(cur); return;
+				case ' ':
+					// Space natively activates focused buttons/links — don't double-fire.
+					if (onActivator) return;
+					if (!cur) return;
+					e.preventDefault();
+					if (cur.status === 'pending') completeTasks([cur]);
+					else if (cur.status === 'completed' || cur.status === 'deleted') restoreTasks([cur]);
+			}
+		};
+
+		onMounted(() => window.addEventListener('keydown', onGridKeydown));
+		onBeforeUnmount(() => window.removeEventListener('keydown', onGridKeydown));
 
 		const tabCount = (st: string): number => {
 			const bucket: any = (classifiedTasks as any)[st];
@@ -718,3 +805,9 @@ export default defineComponent({
 	}
 });
 </script>
+
+<style>
+.tw-table tr.tw-row--cursor > td:first-child {
+	box-shadow: inset 2px 0 0 0 currentColor;
+}
+</style>
