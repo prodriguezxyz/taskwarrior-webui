@@ -22,6 +22,8 @@ cd frontend && npm install && npm run dev
 
 Open `http://localhost:8080`. The dev `TASKRC`/`TASKDATA` point into `backend/test/` so local development does not touch your real Taskwarrior data.
 
+The backend's `npm run dev` script sets `AUTH_MODE=dev` so requests don't need a Cloudflare Access JWT during local development. In production the default is `AUTH_MODE=cloudflare`, which requires `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` (see `DEPLOY.md`). The `dev` mode populates `ctx.state.email` from `DEV_USER_EMAIL` (default `dev@localhost`).
+
 ### Frontend lint
 
 ```sh

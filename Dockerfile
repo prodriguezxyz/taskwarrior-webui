@@ -13,6 +13,11 @@ COPY ./docker/start.sh /start.sh
 ENV TASKRC="/.taskrc"
 ENV TASKDATA="/.task"
 
+# Cloudflare Access auth (set via docker-compose .env)
+ENV AUTH_MODE="cloudflare"
+ENV CF_ACCESS_TEAM_DOMAIN=""
+ENV CF_ACCESS_AUD=""
+
 # Fix npm build
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 

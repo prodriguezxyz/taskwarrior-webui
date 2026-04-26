@@ -12,6 +12,38 @@ $EDITOR .deploy.env          # fill in VPS_HOST and COMPOSE_PATH
 chmod +x deploy.sh
 ```
 
+## Cloudflare Access (auth)
+
+The backend rejects every request that does not carry a valid `Cf-Access-Jwt-Assertion` header. Configure the Access Application once in the Cloudflare dashboard, then inject the resulting tag and team domain via the VPS `.env`.
+
+1. Cloudflare dashboard → **Zero Trust → Access → Applications → Add application → Self-hosted**.
+2. Application domain: the domain where the webui is served (e.g. `tw.example.com`).
+3. Identity provider: One-time PIN (email OTP) or whichever IdP you use.
+4. Policy: `Allow` with the list of emails permitted to use the app.
+5. After saving, copy:
+   - **Application Audience (AUD) Tag** → `CF_ACCESS_AUD`
+   - **Team domain** (e.g. `pedro.cloudflareaccess.com`) → `CF_ACCESS_TEAM_DOMAIN`
+6. On the VPS, in the `.env` next to `docker-compose.yml`:
+
+   ```
+   AUTH_MODE=cloudflare
+   CF_ACCESS_TEAM_DOMAIN=pedro.cloudflareaccess.com
+   CF_ACCESS_AUD=<paste-aud-tag>
+   ```
+
+   And in `docker-compose.yml`:
+
+   ```yaml
+   environment:
+     AUTH_MODE: ${AUTH_MODE}
+     CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+     CF_ACCESS_AUD: ${CF_ACCESS_AUD}
+   ```
+
+The container fails to start if `AUTH_MODE=cloudflare` and either env var is missing.
+
+For local development (`npm run dev`), set `AUTH_MODE=dev` to bypass Cloudflare; see `CLAUDE.md`.
+
 Regular release:
 
 ```sh
