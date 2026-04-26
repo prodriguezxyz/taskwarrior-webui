@@ -32,17 +32,25 @@ app.use(async (ctx, next) => {
 app.use(authMiddleware);
 
 app.use(async (ctx, next) => {
-	// /profiles and /auth are profile-agnostic; the former tolerates stale
-	// X-Profile headers from clients whose localStorage still references a
-	// profile the admin has since removed.
 	if (ctx.path.startsWith('/profiles') || ctx.path.startsWith('/auth')) {
 		await next();
 		return;
 	}
+	const allowed: string[] = ctx.state.user.profiles;
 	const raw = ctx.request.headers['x-profile'];
-	const name = typeof raw === 'string' && raw.length > 0 ? raw : undefined;
-	if (name && !hasProfile(name)) {
-		ctx.throw(400, `Unknown profile: ${name}`);
+	const requested = typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+	let name: string;
+	if (requested) {
+		if (!hasProfile(requested)) {
+			ctx.throw(400, `Unknown profile: ${requested}`);
+		}
+		if (!allowed.includes(requested)) {
+			ctx.throw(403, `profile "${requested}" not allowed for this user`);
+		}
+		name = requested;
+	}
+	else {
+		name = allowed[0];
 	}
 	ctx.state.taskwarrior = getProfile(name);
 	await next();

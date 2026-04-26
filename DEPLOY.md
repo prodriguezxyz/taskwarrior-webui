@@ -44,6 +44,35 @@ The container fails to start if `AUTH_MODE=cloudflare` and either env var is mis
 
 For local development (`npm run dev`), set `AUTH_MODE=dev` to bypass Cloudflare; see `CLAUDE.md`.
 
+## Users
+
+Each authenticated email is mapped to a list of profiles in `users.json`. The backend reads it from `USERS_CONFIG` (default `/users.json`) and rejects any authenticated email that is not provisioned (HTTP 403).
+
+```json
+{
+  "users": [
+    { "email": "you@example.com", "profiles": ["personal", "family"] },
+    { "email": "someone@example.com", "profiles": ["family"] }
+  ]
+}
+```
+
+Rules:
+- `email` must match the address that Cloudflare Access asserts (`email` claim of the JWT, lowercased).
+- Every entry in `profiles` must exist in `profiles.json`. The backend fails to start otherwise.
+- The first profile in the list is the user's default; clients can pick any other via the `X-Profile` request header.
+- Sharing a profile across users (e.g. `family`) means both entries point at the same profile name; for safe concurrent access prefer per-user profile directories that sync to the same taskchampion server rather than sharing files on disk.
+
+Mount alongside `profiles.json`:
+
+```yaml
+volumes:
+  - ./users.json:/users.json:ro
+  - ./profiles.json:/profiles.json:ro
+```
+
+Edit `users.json` and run `docker compose restart taskwarrior-webui` to add or remove users; no rebuild needed.
+
 Regular release:
 
 ```sh

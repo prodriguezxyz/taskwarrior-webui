@@ -1,8 +1,6 @@
 import { Plugin } from '@nuxt/types';
 
 const plugin: Plugin = async ({ $axios, store }) => {
-	store.dispatch('fetchSettings');
-
 	$axios.onRequest(config => {
 		const profile = (store.state as any).settings.profile;
 		if (profile) {
@@ -11,6 +9,8 @@ const plugin: Plugin = async ({ $axios, store }) => {
 		return config;
 	});
 
+	await store.dispatch('fetchMe');
+	store.dispatch('fetchSettings');
 	await store.dispatch('fetchProfiles');
 };
 

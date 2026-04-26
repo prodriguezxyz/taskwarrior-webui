@@ -9,6 +9,7 @@ export const state = () => ({
 		color: '',
 		text: ''
 	},
+	user: null as { email: string, profiles: string[] } | null,
 	settings: {
 		dark: false,
 		autoRefresh: '5', // in minutes
@@ -43,6 +44,10 @@ export const getters: GetterTree<RootState, RootState> = {
 };
 
 export const mutations: MutationTree<RootState> = {
+	setUser(state, user: { email: string, profiles: string[] } | null) {
+		state.user = user;
+	},
+
 	setSettings(state, settings) {
 		state.settings = settings;
 	},
@@ -103,28 +108,46 @@ export const mutations: MutationTree<RootState> = {
 	}
 };
 
+function settingsKey(email: string | undefined): string {
+	return email ? `settings:${email}` : 'settings';
+}
+
+function hiddenColumnsKey(email: string | undefined): string {
+	return email ? `hiddenColumns:${email}` : 'hiddenColumns';
+}
+
 export const actions: ActionTree<RootState, RootState> = {
+	async fetchMe(context) {
+		const payload: { email: string, profiles: string[] }
+			= await this.$axios.$get('/api/auth/me');
+		context.commit('setUser', payload);
+	},
+
 	fetchSettings(context) {
-		const raw = localStorage.getItem('settings');
+		const email = context.state.user?.email;
+		const raw = localStorage.getItem(settingsKey(email));
 		const saved = raw ? JSON.parse(raw) : {};
 		context.commit('setSettings', { ...context.state.settings, ...saved });
 	},
 
 	updateSettings(context, settings) {
+		const email = context.state.user?.email;
 		context.commit('setSettings', settings);
-		localStorage.setItem('settings', JSON.stringify(settings));
+		localStorage.setItem(settingsKey(email), JSON.stringify(settings));
 	},
 
 	fetchHiddenColumns(context) {
-		const columns = localStorage.getItem('hiddenColumns');
+		const email = context.state.user?.email;
+		const columns = localStorage.getItem(hiddenColumnsKey(email));
 		if (columns) {
 			context.commit('setHiddenColumns', JSON.parse(columns));
 		}
 	},
 
 	updateHiddenColumns(context, columns) {
+		const email = context.state.user?.email;
 		context.commit('setHiddenColumns', columns);
-		localStorage.setItem('hiddenColumns', JSON.stringify(columns));
+		localStorage.setItem(hiddenColumnsKey(email), JSON.stringify(columns));
 	},
 
 	async fetchProfiles(context) {

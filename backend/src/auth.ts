@@ -1,6 +1,7 @@
 import { Context, Next } from 'koa';
 import * as Router from '@koa/router';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { findUserByEmail } from './users';
 
 type AuthMode = 'cloudflare' | 'dev';
 
@@ -47,13 +48,19 @@ async function resolveEmail(ctx: Context): Promise<string> {
 }
 
 export async function authMiddleware(ctx: Context, next: Next): Promise<void> {
-	ctx.state.email = await resolveEmail(ctx);
+	const email = await resolveEmail(ctx);
+	const user = findUserByEmail(email);
+	if (!user) {
+		ctx.throw(403, `email "${email}" not provisioned`);
+	}
+	ctx.state.email = email;
+	ctx.state.user = user;
 	await next();
 }
 
 export const authRouter = new Router();
 authRouter.get('/me', async ctx => {
-	ctx.body = { email: ctx.state.email };
+	ctx.body = { email: ctx.state.user.email, profiles: ctx.state.user.profiles };
 });
 
 export function authMode(): AuthMode {

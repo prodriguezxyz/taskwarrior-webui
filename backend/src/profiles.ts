@@ -68,8 +68,9 @@ export function defaultProfileName(): string {
 
 export const profilesRouter = new Router();
 profilesRouter.get('/', async ctx => {
+	const allowed: string[] = ctx.state.user.profiles;
 	ctx.body = {
-		profiles: listProfiles(),
-		default: defaultProfileName()
+		profiles: allowed.map(name => ({ name })),
+		default: allowed[0]
 	};
 });
