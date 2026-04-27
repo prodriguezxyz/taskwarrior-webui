@@ -208,6 +208,18 @@ export const actions: ActionTree<RootState, RootState> = {
 
 	async fetchTasks(context) {
 		const tasks: Task[] = await this.$axios.$get('/api/tasks');
+		// Recurring child instances may be exported without `project`/`tags`
+		// even when their parent template defines them. Inherit from parent
+		// so Inbox/project filters and counts treat them consistently.
+		const byUuid = new Map<string, Task>();
+		for (const t of tasks) if (t.uuid) byUuid.set(t.uuid, t);
+		for (const t of tasks) {
+			if (!t.parent) continue;
+			const parent = byUuid.get(t.parent);
+			if (!parent) continue;
+			if (!t.project && parent.project) t.project = parent.project;
+			if ((!t.tags || !t.tags.length) && parent.tags?.length) t.tags = [...parent.tags];
+		}
 		context.commit('setTasks', tasks);
 	},
 
