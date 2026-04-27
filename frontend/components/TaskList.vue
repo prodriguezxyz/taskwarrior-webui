@@ -525,9 +525,11 @@ export default defineComponent({
 						passStatus = task.status === status;
 					}
 					if (!passStatus) return false;
-					// Inbox scope: when no project/tag filter and not the today/mine bucket, only unprojected
+					// Inbox scope: when no project/tag filter and not the today/mine bucket,
+					// only unprojected non-recurring tasks. Recurring child instances
+					// (task.parent set) are already-triaged routines, not inbox items.
 					if (!projectFilter.value && !sidebarTagFilter.value && view.value !== 'mine'
-						&& status !== 'today' && task.project) return false;
+						&& status !== 'today' && (task.project || (task as any).parent)) return false;
 					return matchesFilters(task);
 				}) || [];
 

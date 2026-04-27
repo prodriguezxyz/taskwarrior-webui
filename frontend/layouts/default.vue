@@ -235,7 +235,7 @@ export default defineComponent({
 		);
 
 		const totalPending = computed(() =>
-			pendingTasks.value.filter((t: any) => !t.project).length
+			pendingTasks.value.filter((t: any) => !t.project && !t.parent).length
 		);
 
 		const totalTags = computed(() => {

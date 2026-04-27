@@ -138,7 +138,7 @@ export default defineComponent({
 			if (projectFilter.value) {
 				return base.filter((t: Task) => t.project === projectFilter.value).length;
 			}
-			return base.filter((t: Task) => !t.project).length;
+			return base.filter((t: Task) => !t.project && !(t as any).parent).length;
 		});
 
 		const progress = computed(() => {
