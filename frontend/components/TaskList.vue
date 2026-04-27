@@ -8,8 +8,8 @@
 		/>
 		<ColumnDialog v-model="showColumnDialog" :active-columns="configurableHeaders" />
 
-		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter }">
-			<nav v-if="projectFilter || sidebarTagFilter" class="tw-tabs" role="tablist">
+		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter && view !== 'mine' }">
+			<nav v-if="projectFilter || sidebarTagFilter || view === 'mine'" class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
 					:key="st"
@@ -87,6 +87,19 @@
 					@click="toggleTag(tag)"
 				>
 					{{ tag }}
+				</button>
+			</div>
+			<div v-if="availableAssignees.length" class="tw-filterbar__group">
+				<span class="tw-filterbar__label">Assigned to</span>
+				<button
+					v-for="email in availableAssignees"
+					:key="email"
+					type="button"
+					class="tw-chip-filter"
+					:class="{ 'tw-chip-filter--active': assigneeFilter.includes(email) }"
+					@click="toggleAssignee(email)"
+				>
+					{{ assigneeLabel(email) }}
 				</button>
 			</div>
 			<div class="tw-filterbar__group">
@@ -220,6 +233,16 @@
 				</template>
 				<template v-slot:item.until="{ item }">
 					{{ displayDate(item.until) }}
+				</template>
+
+				<template v-slot:item.assignee="{ item }">
+					<v-chip
+						v-if="item.assignee"
+						small
+						outlined
+					>
+						{{ assigneeLabel(item.assignee) }}
+					</v-chip>
 				</template>
 
 				<template v-slot:item.tags="{ item }">
@@ -360,10 +383,18 @@ export default defineComponent({
 			deleted: 'Deleted',
 			recurring: 'Recurring'
 		};
+		const showAssigneeColumn = computed(() => {
+			if (store.state.members.length > 1) return true;
+			return props.tasks?.some(t => Boolean((t as any).assignee)) ?? false;
+		});
+
 		const headers = computed(() => [
 			{ text: '', value: '_complete', sortable: false, width: '36px', class: 'tw-th--compact', cellClass: 'tw-td--compact' },
 			{ text: 'Description', value: 'description' },
 			{ text: 'Project', value: 'project' },
+			...(showAssigneeColumn.value
+				? [{ text: 'Assigned to', value: 'assignee' }]
+				: []),
 			{ text: 'Priority', value: 'priority' },
 			{ text: 'Scheduled', value: 'scheduled' },
 			...(status.value === 'recurring'
@@ -391,8 +422,11 @@ export default defineComponent({
 		const projectFilter = computed(() => store.state.projectFilter);
 		const sidebarTagFilter = computed(() => store.state.tagFilter);
 		const tagFilter = ref<string[]>([]);
+		const assigneeFilter = ref<string[]>([]);
 		const priorityFilter: Ref<string | null> = ref(null);
 		const showFilters = ref(false);
+
+		const assigneeLabel = (email?: string) => store.getters.assigneeLabel(email);
 
 		const availableTags = computed(() => {
 			const set = new Set<string>();
@@ -400,11 +434,22 @@ export default defineComponent({
 			return Array.from(set).sort();
 		});
 
+		const availableAssignees = computed(() => {
+			const set = new Set<string>();
+			props.tasks?.forEach(t => {
+				const a = (t as any).assignee;
+				if (a) set.add(a);
+			});
+			return Array.from(set).sort();
+		});
+
 		const hasActiveFilters = computed(() =>
-			tagFilter.value.length > 0 || priorityFilter.value !== null
+			tagFilter.value.length > 0
+			|| assigneeFilter.value.length > 0
+			|| priorityFilter.value !== null
 		);
 
-		watch([tagFilter, priorityFilter], () => {
+		watch([tagFilter, assigneeFilter, priorityFilter], () => {
 			selected.value = [];
 		});
 
@@ -421,12 +466,19 @@ export default defineComponent({
 			else tagFilter.value = tagFilter.value.filter(t => t !== tag);
 		};
 
+		const toggleAssignee = (email: string) => {
+			const idx = assigneeFilter.value.indexOf(email);
+			if (idx === -1) assigneeFilter.value = [...assigneeFilter.value, email];
+			else assigneeFilter.value = assigneeFilter.value.filter(e => e !== email);
+		};
+
 		const togglePriority = (p: string) => {
 			priorityFilter.value = priorityFilter.value === p ? null : p;
 		};
 
 		const clearFilters = () => {
 			tagFilter.value = [];
+			assigneeFilter.value = [];
 			priorityFilter.value = null;
 		};
 
@@ -436,6 +488,14 @@ export default defineComponent({
 			if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
 			if (tagFilter.value.length) {
 				if (!task.tags || !tagFilter.value.every(t => task.tags!.includes(t))) return false;
+			}
+			if (assigneeFilter.value.length) {
+				const a = (task as any).assignee;
+				if (!a || !assigneeFilter.value.includes(a)) return false;
+			}
+			if (view.value === 'mine') {
+				const me = store.state.user?.email;
+				if (!me || (task as any).assignee !== me) return false;
 			}
 			return true;
 		};
@@ -465,8 +525,9 @@ export default defineComponent({
 						passStatus = task.status === status;
 					}
 					if (!passStatus) return false;
-					// Inbox scope: when no project/tag filter and not the today bucket, only unprojected
-					if (!projectFilter.value && !sidebarTagFilter.value && status !== 'today' && task.project) return false;
+					// Inbox scope: when no project/tag filter and not the today/mine bucket, only unprojected
+					if (!projectFilter.value && !sidebarTagFilter.value && view.value !== 'mine'
+						&& status !== 'today' && task.project) return false;
 					return matchesFilters(task);
 				}) || [];
 
@@ -590,7 +651,12 @@ export default defineComponent({
 			return 'Mark as done';
 		};
 
+		const undoTasks = async (originals: Task[]) => {
+			await store.dispatch('updateTasks', originals);
+		};
+
 		const completeTasks = async (tasks: Task[]) => {
+			const originals = tasks.map(t => _.cloneDeep(t));
 			await store.dispatch('updateTasks', tasks.map(task => {
 				return {
 					...task,
@@ -600,21 +666,22 @@ export default defineComponent({
 			selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
 			store.commit('setNotification', {
 				color: 'success',
-				text: 'Successfully complete the task(s)'
+				text: tasks.length === 1 ? 'Task completed' : `${tasks.length} tasks completed`,
+				actionText: 'Undo',
+				actionHandler: () => undoTasks(originals)
 			});
 		};
 
-		const deleteTasks = (tasks: Task[]) => {
-			confirmation.text = 'Are you sure to delete the task(s)?';
-			confirmation.handler = async () => {
-				await store.dispatch('deleteTasks', tasks);
-				selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
-				store.commit('setNotification', {
-					color: 'success',
-					text: 'Successfully delete the task(s)'
-				});
-			};
-			showConfirmationDialog.value = true;
+		const deleteTasks = async (tasks: Task[]) => {
+			const originals = tasks.map(t => _.cloneDeep(t));
+			await store.dispatch('deleteTasks', tasks);
+			selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
+			store.commit('setNotification', {
+				color: 'success',
+				text: tasks.length === 1 ? 'Task deleted' : `${tasks.length} tasks deleted`,
+				actionText: 'Undo',
+				actionHandler: () => undoTasks(originals)
+			});
 		};
 
 		const restoreTasks = (tasks: Task[]) => {
@@ -791,11 +858,15 @@ export default defineComponent({
 			view,
 			currentItems,
 			tagFilter,
+			assigneeFilter,
 			priorityFilter,
 			availableTags,
+			availableAssignees,
+			assigneeLabel,
 			showFilters,
 			hasActiveFilters,
 			toggleTag,
+			toggleAssignee,
 			togglePriority,
 			clearFilters,
 

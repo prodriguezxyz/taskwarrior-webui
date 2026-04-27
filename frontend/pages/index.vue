@@ -74,6 +74,7 @@ export default defineComponent({
 
 		const pageTitle = computed(() => {
 			if (view.value === 'today') return 'Today';
+			if (view.value === 'mine') return 'Assigned to me';
 			if (view.value === 'tags') return 'Tags';
 			if (view.value === 'projects') return 'Projects';
 			if (tagFilter.value) return `#${tagFilter.value}`;
@@ -83,6 +84,7 @@ export default defineComponent({
 
 		const pageIcon = computed(() => {
 			if (view.value === 'today') return 'mdi-calendar-today';
+			if (view.value === 'mine') return 'mdi-account-outline';
 			if (view.value === 'tags') return 'mdi-tag-multiple-outline';
 			if (view.value === 'projects') return 'mdi-folder-multiple-outline';
 			if (tagFilter.value) return 'mdi-tag-outline';
@@ -92,6 +94,7 @@ export default defineComponent({
 
 		const pageIconTone = computed(() => {
 			if (view.value === 'today') return 'tw-page__icon--today';
+			if (view.value === 'mine') return 'tw-page__icon--mine';
 			if (view.value === 'tags') return 'tw-page__icon--tag';
 			if (view.value === 'projects') return '';
 			if (tagFilter.value) return 'tw-page__icon--tag';
@@ -109,6 +112,11 @@ export default defineComponent({
 						|| (t.scheduled && moment(t.scheduled).isAfter(now));
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
 				}).length;
+			}
+			if (view.value === 'mine') {
+				const me = store.state.user?.email;
+				if (!me) return 0;
+				return base.filter((t: Task) => (t as any).assignee === me).length;
 			}
 			if (view.value === 'tags') {
 				const set = new Set<string>();

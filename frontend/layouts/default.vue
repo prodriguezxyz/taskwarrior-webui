@@ -10,11 +10,20 @@
 		<v-snackbar
 			v-model="snackbar"
 			:color="notification.color"
-			:timeout="4000"
+			:timeout="notification.actionHandler ? 6000 : 4000"
 		>
 			{{ notification.text }}
 
 			<template v-slot:action="{ attrs }">
+				<v-btn
+					v-if="notification.actionHandler"
+					dark
+					text
+					v-bind="attrs"
+					@click="runNotificationAction"
+				>
+					{{ notification.actionText || 'Undo' }}
+				</v-btn>
 				<v-btn
 					dark
 					text
@@ -122,6 +131,18 @@
 				</button>
 
 				<button
+					v-if="hasMembers"
+					type="button"
+					class="tw-sidebar__item tw-sidebar__item--mine"
+					:class="{ 'tw-sidebar__item--active': view === 'mine' }"
+					@click="selectMine"
+				>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--mine">mdi-account-outline</v-icon>
+					<span class="tw-sidebar__label">Assigned to me</span>
+					<span v-if="mineCount > 0" class="tw-sidebar__count tw-sidebar__count--mine">{{ mineCount }}</span>
+				</button>
+
+				<button
 					type="button"
 					class="tw-sidebar__item tw-sidebar__item--tag"
 					:class="{ 'tw-sidebar__item--active': view === 'tags' || (view === 'all' && tagFilter) }"
@@ -200,6 +221,7 @@ export default defineComponent({
 			get: () => store.state.settings.profile,
 			set: val => {
 				store.dispatch('updateSettings', { ...store.state.settings, profile: val });
+				store.dispatch('fetchMembers');
 				store.dispatch('fetchTasks');
 			}
 		});
@@ -234,6 +256,14 @@ export default defineComponent({
 			}).length;
 		});
 
+		const hasMembers = computed(() => store.state.members.length > 1);
+
+		const mineCount = computed(() => {
+			const me = store.state.user?.email;
+			if (!me) return 0;
+			return pendingTasks.value.filter((t: any) => t.assignee === me).length;
+		});
+
 		const projectList = computed(() => {
 			const counts = new Map<string, number>();
 			for (const t of pendingTasks.value) {
@@ -264,6 +294,12 @@ export default defineComponent({
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'today');
+		};
+
+		const selectMine = () => {
+			store.commit('setProjectFilter', null);
+			store.commit('setTagFilter', null);
+			store.commit('setView', 'mine');
 		};
 
 		const selectTagsIndex = () => {
@@ -393,6 +429,12 @@ export default defineComponent({
 			set: val => store.commit('setSnackbar', val)
 		});
 
+		const runNotificationAction = () => {
+			const handler = store.state.notification.actionHandler;
+			store.commit('setSnackbar', false);
+			if (handler) handler();
+		};
+
 		onErrorCaptured((err: any) => {
 			let notification: any;
 			if (err?.response) {
@@ -417,6 +459,7 @@ export default defineComponent({
 			dark,
 			snackbar,
 			notification,
+			runNotificationAction,
 			settingsDialog,
 			profiles,
 			currentProfile,
@@ -425,11 +468,14 @@ export default defineComponent({
 			view,
 			totalPending,
 			todayCount,
+			hasMembers,
+			mineCount,
 			projectList,
 			totalTags,
 			setProject,
 			selectInbox,
 			selectToday,
+			selectMine,
 			selectTagsIndex,
 			selectProjectsIndex,
 

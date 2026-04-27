@@ -4,6 +4,7 @@ import { hasProfile } from './profiles';
 export interface User {
 	email: string;
 	profiles: string[];
+	name?: string;
 }
 
 const configPath = process.env.USERS_CONFIG || '/users.json';
@@ -29,6 +30,9 @@ function loadUsers(): User[] {
 		if (!Array.isArray(u.profiles) || u.profiles.length === 0) {
 			throw new Error(`${configPath}: user "${u.email}" must have a non-empty profiles array`);
 		}
+		if (u.name !== undefined && (typeof u.name !== 'string' || u.name.length === 0)) {
+			throw new Error(`${configPath}: user "${u.email}" name must be a non-empty string`);
+		}
 		const email = u.email.toLowerCase();
 		if (emails.has(email)) {
 			throw new Error(`${configPath}: duplicate user email "${email}"`);
@@ -39,7 +43,7 @@ function loadUsers(): User[] {
 			}
 		}
 		emails.add(email);
-		result.push({ email, profiles: u.profiles });
+		result.push({ email, profiles: u.profiles, name: u.name });
 	}
 	return result;
 }
@@ -52,4 +56,8 @@ for (const u of users) {
 
 export function findUserByEmail(email: string): User | undefined {
 	return byEmail.get(email.toLowerCase());
+}
+
+export function listUsers(): User[] {
+	return users;
 }

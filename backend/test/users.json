@@ -1,5 +1,6 @@
 {
   "users": [
-    { "email": "dev@localhost", "profiles": ["Personal", "Trabajo"] }
+    { "email": "dev@localhost", "name": "Pedro", "profiles": ["Personal", "Trabajo"] },
+    { "email": "laura@localhost", "name": "Laura", "profiles": ["Personal"] }
   ]
 }

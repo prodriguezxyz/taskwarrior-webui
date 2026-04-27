@@ -12,6 +12,7 @@ const plugin: Plugin = async ({ $axios, store }) => {
 	await store.dispatch('fetchMe');
 	store.dispatch('fetchSettings');
 	await store.dispatch('fetchProfiles');
+	await store.dispatch('fetchMembers');
 };
 
 export default plugin;

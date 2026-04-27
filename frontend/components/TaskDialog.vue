@@ -27,6 +27,16 @@
 						label="Project"
 						@keydown.enter.native.capture="onProjectEnter"
 					/>
+					<v-select
+						v-if="memberItems.length > 1"
+						v-model="formData.assignee"
+						:items="memberItems"
+						item-text="label"
+						item-value="email"
+						label="Assigned to"
+						clearable
+						prepend-inner-icon="mdi-account-outline"
+					/>
 					<v-combobox
 						v-model="formData.tags"
 						:items="tags"
@@ -152,6 +162,12 @@ export default defineComponent({
 
 		const projects = computed(() => store.getters.projects);
 		const tags = computed(() => store.getters.tags);
+		const memberItems = computed(() =>
+			store.state.members.map(m => ({
+				email: m.email,
+				label: m.name || m.email.split('@')[0]
+			}))
+		);
 
 		const showDialog = computed({
 			get: () => props.value,
@@ -203,6 +219,7 @@ export default defineComponent({
 		const formData = ref({
 			description: '',
 			project: '',
+			assignee: '',
 			scheduled: '',
 			due: '',
 			until: '',
@@ -218,6 +235,7 @@ export default defineComponent({
 			formData.value = {
 				description: '',
 				project: '',
+				assignee: '',
 				scheduled: '',
 				due: '',
 				until: '',
@@ -262,6 +280,7 @@ export default defineComponent({
 					...formData.value,
 					annotations: formData.value.annotations || [],
 					project: formData.value.project || undefined,
+					assignee: formData.value.assignee || undefined,
 					scheduled: formData.value.scheduled || undefined,
 					due: formData.value.due || undefined,
 					until: formData.value.until || undefined,
@@ -289,6 +308,7 @@ export default defineComponent({
 			formRef,
 			tags,
 			projects,
+			memberItems,
 			priorities,
 			recur,
 			formData,

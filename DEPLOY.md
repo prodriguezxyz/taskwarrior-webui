@@ -51,17 +51,24 @@ Each authenticated email is mapped to a list of profiles in `users.json`. The ba
 ```json
 {
   "users": [
-    { "email": "you@example.com", "profiles": ["personal", "family"] },
-    { "email": "someone@example.com", "profiles": ["family"] }
+    { "email": "you@example.com", "name": "You", "profiles": ["personal", "family"] },
+    { "email": "someone@example.com", "name": "Someone", "profiles": ["family"] }
   ]
 }
 ```
 
 Rules:
 - `email` must match the address that Cloudflare Access asserts (`email` claim of the JWT, lowercased).
+- `name` is optional — the friendly label shown in the assignee dropdown and the assignee chip on tasks. If omitted, the local part of the email (before `@`) is used.
 - Every entry in `profiles` must exist in `profiles.json`. The backend fails to start otherwise.
 - The first profile in the list is the user's default; clients can pick any other via the `X-Profile` request header.
 - Sharing a profile across users (e.g. `family`) means both entries point at the same profile name; for safe concurrent access prefer per-user profile directories that sync to the same taskchampion server rather than sharing files on disk.
+
+### Task assignment
+
+Each profile gets a `uda.assignee` field auto-configured into its `.taskrc` on backend startup (`uda.assignee.type=string`, `uda.assignee.label=Assigned to`). No manual edit needed; the field syncs through Taskchampion as a regular UDA.
+
+The dropdown of assignable people for a profile is **derived from `users.json`**: anyone whose `profiles` array contains the active profile is listed. As a consequence, you can only assign tasks to people who also have webui access to that profile. Stale assignees (someone removed from `users.json` but still on existing tasks) keep showing as a chip with the email's local part — they remain inspectable but no longer re-selectable.
 
 Mount alongside `profiles.json`:
 

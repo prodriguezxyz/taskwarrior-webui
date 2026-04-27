@@ -7,7 +7,9 @@ export const state = () => ({
 	snackbar: false,
 	notification: {
 		color: '',
-		text: ''
+		text: '',
+		actionText: '' as string | undefined,
+		actionHandler: null as (() => void) | null
 	},
 	user: null as { email: string, profiles: string[] } | null,
 	settings: {
@@ -19,9 +21,11 @@ export const state = () => ({
 	hiddenColumns: [] as string[],
 	profiles: [] as Array<{ name: string }>,
 	defaultProfile: '',
+	members: [] as Array<{ email: string, name: string }>,
 	projectFilter: null as string | null,
 	tagFilter: null as string | null,
-	view: 'all' as 'all' | 'today' | 'tags' | 'projects',
+	assigneeFilter: null as string | null,
+	view: 'all' as 'all' | 'today' | 'tags' | 'projects' | 'mine',
 	searchOpen: false,
 	quickAddOpen: false,
 	taskDialog: {
@@ -40,6 +44,21 @@ export const getters: GetterTree<RootState, RootState> = {
 			if (task.tags) for (const t of task.tags) set.add(t);
 		}
 		return Array.from(set).sort();
+	},
+	assignees: state => {
+		const set = new Set<string>();
+		for (const task of state.tasks) {
+			const a = (task as any).assignee;
+			if (a) set.add(a);
+		}
+		return Array.from(set).sort();
+	},
+	assigneeLabel: state => (email?: string): string => {
+		if (!email) return '';
+		const m = state.members.find(x => x.email === email);
+		if (m && m.name) return m.name;
+		const at = email.indexOf('@');
+		return at > 0 ? email.slice(0, at) : email;
 	}
 };
 
@@ -65,6 +84,10 @@ export const mutations: MutationTree<RootState> = {
 		state.defaultProfile = payload.default;
 	},
 
+	setMembers(state, members: Array<{ email: string, name: string }>) {
+		state.members = members;
+	},
+
 	setNotification(state, notification) {
 		state.notification = notification;
 		// Show notification
@@ -83,7 +106,11 @@ export const mutations: MutationTree<RootState> = {
 		state.tagFilter = value;
 	},
 
-	setView(state, value: 'all' | 'today' | 'tags' | 'projects') {
+	setAssigneeFilter(state, value: string | null) {
+		state.assigneeFilter = value;
+	},
+
+	setView(state, value: 'all' | 'today' | 'tags' | 'projects' | 'mine') {
 		state.view = value;
 	},
 
@@ -158,6 +185,24 @@ export const actions: ActionTree<RootState, RootState> = {
 		const valid = payload.profiles.some(p => p.name === settings.profile);
 		if (!valid) {
 			context.dispatch('updateSettings', { ...settings, profile: payload.default });
+		}
+	},
+
+	async fetchMembers(context) {
+		const profile = context.state.settings.profile;
+		if (!profile) {
+			context.commit('setMembers', []);
+			return;
+		}
+		try {
+			const payload: { members: Array<{ email: string, name: string }> }
+				= await this.$axios.$get(`/api/profiles/${encodeURIComponent(profile)}/members`);
+			context.commit('setMembers', payload.members);
+		}
+		catch (err) {
+			// Non-fatal: members list is auxiliary. Leave whatever was previously cached
+			// rather than blowing up the boot flow or profile switch.
+			console.error('[store] fetchMembers failed:', err);
 		}
 	},
 

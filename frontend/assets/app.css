@@ -297,6 +297,10 @@ body { font-family: var(--tw-font); }
 	color: var(--tw-st-today) !important;
 }
 
+.v-icon.tw-page__icon--mine {
+	color: var(--tw-st-pending) !important;
+}
+
 .v-icon.tw-page__icon--tag {
 	color: var(--tw-st-recurring) !important;
 }
@@ -644,6 +648,19 @@ body { font-family: var(--tw-font); }
 .tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__icon--today,
 .tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__count--today {
 	color: var(--tw-st-today) !important;
+}
+
+/* Mine entry — blue tone, mirrors Today's pattern */
+.tw-sidebar__icon--mine { color: var(--tw-st-pending) !important; }
+.tw-sidebar__count--mine { color: var(--tw-st-pending); }
+.tw-sidebar__item--mine.tw-sidebar__item--active,
+.tw-sidebar__item--mine.tw-sidebar__item--active:hover {
+	background: var(--tw-st-pending-soft);
+	color: var(--tw-st-pending);
+}
+.tw-sidebar__item--mine.tw-sidebar__item--active .tw-sidebar__icon--mine,
+.tw-sidebar__item--mine.tw-sidebar__item--active .tw-sidebar__count--mine {
+	color: var(--tw-st-pending) !important;
 }
 
 /* Inbox entry — emerald icon on idle; default active treatment already uses accent */
