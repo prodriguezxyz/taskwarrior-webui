@@ -77,11 +77,15 @@ export default {
 
 	pwa: {
 		meta: {
-			name: 'Taskwarrior-webui'
+			name: 'Taskwarrior-webui',
+			theme_color: '#0F0F10',
+			lang: 'es'
 		},
 		manifest: {
 			name: 'Taskwarrior-webui',
-			short_name: 'Taskwarrior-webui'
+			short_name: 'Taskwarrior-webui',
+			background_color: '#0F0F10',
+			lang: 'es'
 		},
 		workbox: {
 			enabled: process.env.NODE_ENV === 'production'
