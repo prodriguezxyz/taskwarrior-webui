@@ -13,8 +13,9 @@ COPY ./docker/start.sh /start.sh
 ENV TASKRC="/.taskrc"
 ENV TASKDATA="/.task"
 
-# Cloudflare Access auth (set via docker-compose .env)
-ENV AUTH_MODE="cloudflare"
+# Cloudflare Access auth — set via docker-compose .env at runtime.
+# AUTH_MODE defaults to "cloudflare" in backend/src/auth.ts and docker/start.sh
+# when unset, so it isn't baked here (BuildKit flags ENV names containing "AUTH").
 ENV CF_ACCESS_TEAM_DOMAIN=""
 ENV CF_ACCESS_AUD=""
 
