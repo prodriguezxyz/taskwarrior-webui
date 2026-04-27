@@ -66,7 +66,14 @@
 			</div>
 		</v-app-bar>
 
-		<v-navigation-drawer app permanent width="240" class="tw-sidebar" :mini-variant="false">
+		<v-navigation-drawer
+			app
+			permanent
+			:width="sidebarWidth"
+			class="tw-sidebar"
+			:class="{ 'tw-sidebar--resizing': resizing }"
+			:mini-variant="false"
+		>
 			<div v-if="profiles.length > 1" class="tw-sidebar__header">
 				<v-select
 					:items="profiles.map(p => p.name)"
@@ -189,6 +196,15 @@
 					</div>
 				</div>
 			</nav>
+
+			<div
+				class="tw-sidebar__resize"
+				title="Drag to resize · double-click to reset"
+				role="separator"
+				aria-orientation="vertical"
+				@pointerdown="startResize"
+				@dblclick="resetSidebarWidth"
+			/>
 		</v-navigation-drawer>
 
 		<v-main>
@@ -335,6 +351,39 @@ export default defineComponent({
 		const shortcutsOpen = ref(false);
 		const settingsDialog = ref(false);
 
+		const SIDEBAR_WIDTH_KEY = 'sidebarWidth';
+		const SIDEBAR_DEFAULT = 240;
+		const SIDEBAR_MIN = 200;
+		const SIDEBAR_MAX = 480;
+		const clampWidth = (n: number) => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
+
+		const sidebarWidth = ref(SIDEBAR_DEFAULT);
+		const resizing = ref(false);
+
+		const onResizeMove = (e: PointerEvent) => {
+			sidebarWidth.value = clampWidth(e.clientX);
+		};
+		const onResizeEnd = () => {
+			resizing.value = false;
+			window.removeEventListener('pointermove', onResizeMove);
+			window.removeEventListener('pointerup', onResizeEnd);
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+			localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value));
+		};
+		const startResize = (e: PointerEvent) => {
+			e.preventDefault();
+			resizing.value = true;
+			window.addEventListener('pointermove', onResizeMove);
+			window.addEventListener('pointerup', onResizeEnd);
+			document.body.style.cursor = 'col-resize';
+			document.body.style.userSelect = 'none';
+		};
+		const resetSidebarWidth = () => {
+			sidebarWidth.value = SIDEBAR_DEFAULT;
+			localStorage.setItem(SIDEBAR_WIDTH_KEY, String(SIDEBAR_DEFAULT));
+		};
+
 		const isTypingTarget = (el: EventTarget | null) => {
 			if (!(el instanceof HTMLElement)) return false;
 			const tag = el.tagName;
@@ -410,9 +459,16 @@ export default defineComponent({
 			}
 		};
 
-		onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
+		onMounted(() => {
+			window.addEventListener('keydown', onGlobalKeydown);
+			const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+			const n = raw ? Number(raw) : NaN;
+			if (Number.isFinite(n)) sidebarWidth.value = clampWidth(n);
+		});
 		onBeforeUnmount(() => {
 			window.removeEventListener('keydown', onGlobalKeydown);
+			window.removeEventListener('pointermove', onResizeMove);
+			window.removeEventListener('pointerup', onResizeEnd);
 			disarmG();
 		});
 
@@ -491,6 +547,11 @@ export default defineComponent({
 			manageProject,
 
 			shortcutsOpen,
+
+			sidebarWidth,
+			resizing,
+			startResize,
+			resetSidebarWidth,
 
 			SettingsDialog,
 			TaskDialog,

@@ -531,6 +531,25 @@ body { font-family: var(--tw-font); }
 	box-shadow: none !important;
 }
 
+/* Drag-handle on the right edge of the sidebar — hairline visible on hover. */
+.tw-sidebar__resize {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 6px;
+	height: 100%;
+	cursor: col-resize;
+	z-index: 5;
+	background: transparent;
+	transition: background 120ms ease;
+	touch-action: none;
+}
+
+.tw-sidebar__resize:hover,
+.tw-sidebar--resizing .tw-sidebar__resize {
+	background: var(--tw-accent-soft);
+}
+
 .tw-sidebar__header {
 	padding: 10px 10px 0;
 }
