@@ -285,8 +285,11 @@ export default defineComponent({
 			for (const t of pendingTasks.value) {
 				if (t.project) counts.set(t.project, (counts.get(t.project) || 0) + 1);
 			}
-			// Include projects that have no pending tasks too (from any task)
+			// Include projects that have no pending tasks too (from any task),
+			// but skip projects whose only remaining tasks are deleted — otherwise
+			// a "deleted" project keeps showing in the sidebar with count 0.
 			for (const t of store.state.tasks) {
+				if (t.status === 'deleted') continue;
 				if (t.project && !counts.has(t.project)) counts.set(t.project, 0);
 			}
 			return Array.from(counts.entries())

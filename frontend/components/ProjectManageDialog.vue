@@ -55,7 +55,9 @@
 		<ConfirmationDialog
 			v-model="showConfirm"
 			:title="'Delete project'"
-			:text="`Clear project '${project}' from ${affectedCount} task${affectedCount === 1 ? '' : 's'}? Tasks are kept, they just fall back to Inbox.`"
+			:text="deletableCount === 0
+				? `Delete project '${project}'? It has no active tasks.`
+				: `Delete project '${project}' and all ${deletableCount} task${deletableCount === 1 ? '' : 's'} inside it? Deleted tasks can be restored individually from the Deleted tab.`"
 			@yes="remove"
 		/>
 	</v-dialog>
@@ -95,6 +97,13 @@ export default defineComponent({
 			store.state.tasks.filter(t => t.project === props.project)
 		);
 		const affectedCount = computed(() => affectedTasks.value.length);
+		// For deletion, skip tasks already marked deleted — re-deleting them is a
+		// no-op at best and a Taskwarrior error at worst. Rename still touches them
+		// so the project label stays consistent across the trash bin too.
+		const deletableTasks = computed((): Task[] =>
+			affectedTasks.value.filter(t => t.status !== 'deleted')
+		);
+		const deletableCount = computed(() => deletableTasks.value.length);
 
 		const sanitize = (s: string) => s.trim();
 
@@ -149,21 +158,22 @@ export default defineComponent({
 
 		const remove = async () => {
 			const from = props.project;
-			// Use '' (not undefined) so JSON.stringify keeps the key; task import
-			// only clears attributes that are explicitly present in the payload.
-			const updated = affectedTasks.value.map(t => ({ ...t, project: '' }));
+			const toDelete = deletableTasks.value;
 
-			if (updated.length > 0) {
-				await store.dispatch('updateTasks', updated);
+			if (toDelete.length > 0) {
+				await store.dispatch('deleteTasks', toDelete);
 			}
 
 			if (store.state.projectFilter === from) {
 				store.commit('setProjectFilter', null);
 			}
 
+			const count = toDelete.length;
 			store.commit('setNotification', {
 				color: 'success',
-				text: `Cleared project ${from}`
+				text: count === 0
+					? `Deleted project ${from}`
+					: `Deleted project ${from} and ${count} task${count === 1 ? '' : 's'}`
 			});
 			showConfirm.value = false;
 			close();
@@ -177,6 +187,7 @@ export default defineComponent({
 			showConfirm,
 			inputRef,
 			affectedCount,
+			deletableCount,
 			close,
 			rename,
 			confirmDelete,
