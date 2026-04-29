@@ -163,10 +163,10 @@
 					v-if="status !== 'deleted'"
 					type="button"
 					class="tw-btn tw-btn--ghost tw-btn--danger"
-					@click="deleteTasks(selected)"
+					@click="onBulkDelete(selected)"
 				>
 					<v-icon size="16" left>mdi-delete-outline</v-icon>
-					Delete
+					{{ status === 'recurring' ? 'Stop series' : 'Delete' }}
 				</button>
 			</div>
 
@@ -269,11 +269,20 @@
 						mdi-pencil
 					</v-icon>
 					<v-icon
+						v-if="item.parent && status !== 'deleted'"
+						class="ml-2"
+						size="20px"
+						@click="onActionClick($event, () => confirmDeleteSeries([item]))"
+						title="Stop recurring series"
+					>
+						mdi-restart-off
+					</v-icon>
+					<v-icon
 						v-show="status !== 'deleted'"
 						class="ml-2"
 						size="20px"
-						@click="onActionClick($event, () => deleteTasks([item]))"
-						title="Delete"
+						@click="onActionClick($event, () => onRowDelete(item))"
+						:title="item.status === 'recurring' ? 'Stop recurring series' : 'Delete'"
 					>
 						mdi-delete
 					</v-icon>
@@ -686,7 +695,42 @@ export default defineComponent({
 			});
 		};
 
+		// Stop a recurring series by deleting the parent template. Existing child
+		// instances stay; no new ones get generated. We require explicit confirmation
+		// because rolling back a deleted recurring parent in Taskwarrior is not clean
+		// — undo wouldn't reliably restore the series — and the action affects every
+		// future instance, not just the one the user is looking at.
+		const confirmDeleteSeries = (tasks: Task[]) => {
+			const parents = tasks.map(t => ({ uuid: ((t as any).parent as string) || (t.uuid as string) }));
+			const count = parents.length;
+			confirmation.title = 'Stop recurring series';
+			confirmation.text = count === 1
+				? 'Delete the entire recurring series? Existing instances stay but no new ones will be generated.'
+				: `Delete ${count} recurring series? Existing instances stay but no new ones will be generated.`;
+			confirmation.handler = async () => {
+				await store.dispatch('deleteTasks', parents);
+				selected.value = selected.value.filter(task =>
+					!parents.some(p => p.uuid === task.uuid));
+				store.commit('setNotification', {
+					color: 'success',
+					text: count === 1 ? 'Recurring series deleted' : `${count} recurring series deleted`
+				});
+			};
+			showConfirmationDialog.value = true;
+		};
+
+		const onRowDelete = (task: Task) => {
+			if (task.status === 'recurring') confirmDeleteSeries([task]);
+			else deleteTasks([task]);
+		};
+
+		const onBulkDelete = (tasks: Task[]) => {
+			if (status.value === 'recurring') confirmDeleteSeries(tasks);
+			else deleteTasks(tasks);
+		};
+
 		const restoreTasks = (tasks: Task[]) => {
+			confirmation.title = 'Confirm';
 			confirmation.text = 'Are you sure to restore the task(s)?';
 			confirmation.handler = async () => {
 				await store.dispatch('updateTasks', tasks.map(task => {
@@ -844,6 +888,9 @@ export default defineComponent({
 			completeBtnClass,
 			completeBtnTitle,
 			deleteTasks,
+			confirmDeleteSeries,
+			onRowDelete,
+			onBulkDelete,
 			completeTasks,
 			restoreTasks,
 			showConfirmationDialog,
