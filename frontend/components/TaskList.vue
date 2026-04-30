@@ -937,11 +937,14 @@ export default defineComponent({
 		type SwipeState = {
 			tr: HTMLElement;
 			uuid: string;
+			pointerId: number;
 			startX: number;
 			startY: number;
 			direction: 'h' | 'v' | null;
 		};
 		let swipeState: SwipeState | null = null;
+
+		let swipeCleanupTimer: number | null = null;
 
 		const swipeCleanup = (tr: HTMLElement) => {
 			tr.style.transform = '';
@@ -952,20 +955,28 @@ export default defineComponent({
 		const onSwipeStart = (e: PointerEvent) => {
 			if (!isMobile.value) return;
 			if (e.pointerType === 'mouse') return;
+			// One finger at a time — a second touch shouldn't hijack the gesture.
+			if (swipeState) return;
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
-			// Don't swipe when starting on an interactive control or pagination row
 			if (target.closest('button, a, .v-data-footer, thead')) return;
 			const tr = target.closest('tr') as HTMLElement | null;
 			if (!tr || tr.classList.contains('v-row-group__header')) return;
 			const uuidEl = tr.querySelector('[data-task-uuid]') as HTMLElement | null;
 			const uuid = uuidEl?.dataset.taskUuid;
 			if (!uuid) return;
-			swipeState = { tr, uuid, startX: e.clientX, startY: e.clientY, direction: null };
+			// Cancel any in-flight snap-back animation so the new gesture doesn't
+			// inherit a transition and animate to the finger position.
+			if (swipeCleanupTimer !== null) {
+				window.clearTimeout(swipeCleanupTimer);
+				swipeCleanupTimer = null;
+			}
+			swipeCleanup(tr);
+			swipeState = { tr, uuid, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, direction: null };
 		};
 
 		const onSwipeMove = (e: PointerEvent) => {
-			if (!swipeState) return;
+			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const dx = e.clientX - swipeState.startX;
 			const dy = e.clientY - swipeState.startY;
 			if (swipeState.direction === null) {
@@ -990,14 +1001,35 @@ export default defineComponent({
 		};
 
 		const onSwipeEnd = (e: PointerEvent) => {
-			if (!swipeState) return;
+			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const s = swipeState;
 			swipeState = null;
 			const dx = e.clientX - s.startX;
-			const armed = s.direction === 'h' && Math.abs(dx) >= SWIPE_ACTION_THRESHOLD;
+			const horizontal = s.direction === 'h';
+			const armed = horizontal && Math.abs(dx) >= SWIPE_ACTION_THRESHOLD;
+
 			s.tr.style.transition = 'transform 180ms ease, background-color 180ms ease';
 			s.tr.style.transform = '';
-			window.setTimeout(() => swipeCleanup(s.tr), 220);
+			if (swipeCleanupTimer !== null) window.clearTimeout(swipeCleanupTimer);
+			swipeCleanupTimer = window.setTimeout(() => {
+				swipeCleanup(s.tr);
+				swipeCleanupTimer = null;
+			}, 220);
+
+			// Suppress the synthetic click that follows pointerup after a real
+			// horizontal swipe — otherwise the description's @click would open
+			// the edit dialog after every successful swipe.
+			if (horizontal && Math.abs(dx) > SWIPE_DIRECTION_LOCK) {
+				const suppress = (ev: MouseEvent) => {
+					ev.stopPropagation();
+					ev.preventDefault();
+				};
+				window.addEventListener('click', suppress, { capture: true, once: true });
+				window.setTimeout(() => {
+					window.removeEventListener('click', suppress, true);
+				}, 150);
+			}
+
 			if (!armed) return;
 			const item = currentItems.value.find(i => i.uuid === s.uuid);
 			if (!item) return;
@@ -1010,11 +1042,15 @@ export default defineComponent({
 			}
 		};
 
-		const onSwipeCancel = () => {
-			if (!swipeState) return;
+		const onSwipeCancel = (e: PointerEvent) => {
+			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const tr = swipeState.tr;
 			swipeState = null;
 			swipeCleanup(tr);
+			if (swipeCleanupTimer !== null) {
+				window.clearTimeout(swipeCleanupTimer);
+				swipeCleanupTimer = null;
+			}
 		};
 
 		onMounted(() => {

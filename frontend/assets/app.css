@@ -1935,12 +1935,13 @@ button.tw-icon-btn:focus-visible {
 
 .v-application .tw-table tbody tr.tw-row--swipe-right::before,
 .v-application .tw-table tbody tr.tw-row--swipe-left::before {
-	font-family: 'Material Design Icons';
+	display: inline-block;
+	font: normal normal normal 22px/1 'Material Design Icons';
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
-	font-size: 22px;
-	line-height: 1;
 	pointer-events: none;
 	z-index: 1;
 }
