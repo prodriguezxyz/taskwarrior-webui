@@ -50,9 +50,6 @@
 	--tw-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
-html.theme--dark { color-scheme: dark; }
-html { color-scheme: light; }
-
 .theme--dark {
 	--tw-bg: #0F0F10;
 	--tw-surface: #1B1B1F;
@@ -200,7 +197,9 @@ body { font-family: var(--tw-font); }
 button.tw-icon-btn {
 	appearance: none;
 	border: none;
+	padding: 0;
 	font: inherit;
+	cursor: pointer;
 }
 
 button.tw-icon-btn:focus-visible {
@@ -1099,6 +1098,13 @@ button.tw-icon-btn:focus-visible {
 }
 
 .tw-palette__input::placeholder { color: var(--tw-text-faint); }
+
+/* type='search' brings WebKit's native cancel button — we render our own */
+.tw-palette__input::-webkit-search-cancel-button,
+.tw-palette__input::-webkit-search-decoration {
+	-webkit-appearance: none;
+	appearance: none;
+}
 
 .tw-palette__clear {
 	appearance: none;

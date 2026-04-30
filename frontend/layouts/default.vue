@@ -230,7 +230,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref, provide } from '@nuxtjs/composition-api';
+import { defineComponent, useContext, useStore, computed, onErrorCaptured, onMounted, onBeforeUnmount, ref, provide, watch } from '@nuxtjs/composition-api';
 import moment from 'moment';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import TaskDialog from '../components/TaskDialog.vue';
@@ -532,6 +532,14 @@ export default defineComponent({
 				context.$vuetify.theme.dark = val;
 			}
 		});
+
+		// Mirror the active theme onto <html> so native UI (scrollbars, native
+		// inputs, form controls in dark mode on Windows) renders consistently.
+		watch(dark, val => {
+			if (typeof document !== 'undefined') {
+				document.documentElement.style.setProperty('color-scheme', val ? 'dark' : 'light');
+			}
+		}, { immediate: true });
 
 		const notification = computed(() => store.state.notification);
 		const snackbar = computed({
