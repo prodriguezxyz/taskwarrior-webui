@@ -2150,6 +2150,12 @@ button.tw-icon-btn:focus-visible {
 		border-radius: 0 !important;
 	}
 
+	/* On phones the only visible column is Description (+ complete & delete);
+	   the column headers add no signal so we drop the entire thead. */
+	.v-application .v-data-table.tw-table thead {
+		display: none;
+	}
+
 	/* Profile chip — push to its own line so it doesn't truncate descriptions */
 	.tw-profile-chip {
 		display: inline-block;

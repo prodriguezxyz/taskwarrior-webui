@@ -183,6 +183,7 @@
 				:group-by="groupBy"
 				:items-per-page="20"
 				:footer-props="{ 'items-per-page-options': [10, 20, 50, 100, -1] }"
+				:mobile-breakpoint="0"
 				class="tw-table"
 				style="width: 100%"
 				@click:row="onRowClick"
