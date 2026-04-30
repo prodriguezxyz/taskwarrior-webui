@@ -213,18 +213,44 @@
 				</template>
 
 				<template v-slot:item.description="{ item }">
-					<span
-						class="tw-description tw-description--clickable"
-						title="Edit task"
-						@click="onDescriptionClick($event, item)"
-					>
-						<span v-html="linkify(item.description)" />
+					<div class="tw-description-cell">
 						<span
-							v-if="showProfileChip && item._profile"
-							class="tw-profile-chip"
-							:title="`Profile: ${item._profile}`"
-						>{{ item._profile }}</span>
-					</span>
+							class="tw-description tw-description--clickable"
+							title="Edit task"
+							@click="onDescriptionClick($event, item)"
+						>
+							<span v-html="linkify(item.description)" />
+							<span
+								v-if="showProfileChip && item._profile"
+								class="tw-profile-chip"
+								:title="`Profile: ${item._profile}`"
+							>{{ item._profile }}</span>
+						</span>
+						<div class="tw-description__sub">
+							<span v-if="item.project" class="tw-description__sub-meta">
+								<v-icon size="11">mdi-folder-outline</v-icon>
+								{{ item.project }}
+							</span>
+							<span
+								v-if="item.due"
+								class="tw-description__sub-meta"
+								:class="dueMetaClass(item)"
+							>
+								<v-icon size="11">mdi-calendar-outline</v-icon>
+								{{ displayDate(item.due) }}
+							</span>
+							<span
+								v-if="item.priority"
+								class="tw-description__sub-prio"
+								:class="'tw-description__sub-prio--' + item.priority"
+							>P{{ item.priority }}</span>
+							<span
+								v-for="tag in item.tags"
+								:key="tag"
+								class="tw-description__sub-tag"
+							>#{{ tag }}</span>
+						</div>
+					</div>
 				</template>
 
 				<template v-if="status === 'waiting'" v-slot:item.wait="{ item }">
@@ -266,7 +292,7 @@
 
 				<template v-slot:item.actions="{ item }">
 					<v-icon
-						class="ml-2"
+						class="ml-2 tw-rowaction tw-rowaction--edit"
 						size="20px"
 						@click="onActionClick($event, () => editTask(item))"
 						title="Edit"
@@ -275,7 +301,7 @@
 					</v-icon>
 					<v-icon
 						v-if="item.parent && status !== 'deleted'"
-						class="ml-2"
+						class="ml-2 tw-rowaction tw-rowaction--stop"
 						size="20px"
 						@click="onActionClick($event, () => confirmDeleteSeries([item]))"
 						title="Stop recurring series"
@@ -284,7 +310,7 @@
 					</v-icon>
 					<v-icon
 						v-show="status !== 'deleted'"
-						class="ml-2"
+						class="ml-2 tw-rowaction tw-rowaction--delete"
 						size="20px"
 						@click="onActionClick($event, () => onRowDelete(item))"
 						:title="item.status === 'recurring' ? 'Stop recurring series' : 'Delete'"
@@ -419,8 +445,8 @@ export default defineComponent({
 				? [{ text: 'Recur', value: 'recur', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' }]
 				: []),
 			...(status.value !== 'waiting'
-				? [{ text: 'Due', value: 'due' }]
-				: [{ text: 'Wait', value: 'wait' }]),
+				? [{ text: 'Due', value: 'due', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' }]
+				: [{ text: 'Wait', value: 'wait', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' }]),
 			{ text: 'Until', value: 'until', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
 			{ text: 'Tags', value: 'tags', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
 			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
@@ -794,6 +820,14 @@ export default defineComponent({
 			if (el) el.scrollIntoView({ block: 'nearest' });
 		};
 
+		const dueMetaClass = (item: Task) => {
+			if (!item.due) return '';
+			if (item.status !== 'pending') return '';
+			if (expiredDate(item.due)) return 'tw-description__sub-meta--overdue';
+			if (urgentDate(item.due)) return 'tw-description__sub-meta--soon';
+			return '';
+		};
+
 		const rowClass = (item: Task) => {
 			const sel = selected.value.some(t => t.uuid === item.uuid) ? 'tw-row--selected' : '';
 			const cur = cursorUuid.value === item.uuid ? 'tw-row--cursor' : '';
@@ -921,6 +955,7 @@ export default defineComponent({
 			showColumnDialog,
 			confirmation,
 			displayDate,
+			dueMetaClass,
 			rowClass,
 			selectStatus,
 			tabCount,

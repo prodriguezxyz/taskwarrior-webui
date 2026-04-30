@@ -1980,6 +1980,12 @@ body { font-family: var(--tw-font); }
 	}
 }
 
+/* Description sub-row — hidden by default; shown on phones to collapse
+   project / due / priority / tags into one line under the description. */
+.tw-description-cell { display: block; }
+
+.tw-description__sub { display: none; }
+
 /* Phones — hide low-priority columns so the table doesn't horizontally explode.
    Description, project, due date, and the action icons are the must-haves. */
 @media (max-width: 600px) {
@@ -2020,5 +2026,86 @@ body { font-family: var(--tw-font); }
 		display: inline-block;
 		margin-left: 4px;
 		font-size: 10px;
+	}
+
+	/* Show the sub-row (project / due / priority / tags) under each description */
+	.tw-description__sub {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+		margin-top: 4px;
+		font-size: 11px;
+		color: var(--tw-text-muted);
+		line-height: 1.4;
+	}
+
+	.tw-description__sub-meta {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+	}
+
+	.tw-description__sub-meta .v-icon { color: var(--tw-text-faint) !important; }
+
+	.tw-description__sub-meta--overdue {
+		color: var(--tw-danger);
+	}
+	.tw-description__sub-meta--overdue .v-icon { color: var(--tw-danger) !important; }
+
+	.tw-description__sub-meta--soon {
+		color: var(--tw-st-today);
+	}
+	.tw-description__sub-meta--soon .v-icon { color: var(--tw-st-today) !important; }
+
+	.tw-description__sub-prio {
+		display: inline-flex;
+		align-items: center;
+		padding: 0 5px;
+		border-radius: 3px;
+		font-weight: 600;
+		font-size: 10px;
+		background: var(--tw-surface);
+		color: var(--tw-text-muted);
+		line-height: 1.6;
+	}
+	.tw-description__sub-prio--H {
+		color: var(--tw-danger);
+		background: var(--tw-danger-soft);
+	}
+	.tw-description__sub-prio--M {
+		color: var(--tw-warning);
+		background: var(--tw-warning-soft);
+	}
+
+	.tw-description__sub-tag {
+		display: inline-flex;
+		align-items: center;
+		font-size: 11px;
+		color: var(--tw-text-muted);
+	}
+
+	/* Description text wraps onto multiple lines — no truncation */
+	.tw-description-cell .tw-description {
+		display: block;
+		white-space: normal;
+		line-height: 1.45;
+	}
+
+	/* Compact actions on phone: only the delete icon stays */
+	.v-application .tw-table .tw-rowaction--edit,
+	.v-application .tw-table .tw-rowaction--stop {
+		display: none !important;
+	}
+
+	.v-application .tw-table .tw-rowaction--delete {
+		margin-left: 0 !important;
+	}
+
+	/* Trim padding around the actions column too */
+	.v-application .tw-table tbody td:last-child,
+	.v-application .tw-table thead th:last-child {
+		padding-left: 6px !important;
+		padding-right: 8px !important;
 	}
 }
