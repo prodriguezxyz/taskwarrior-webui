@@ -187,6 +187,7 @@
 				class="tw-table"
 				style="width: 100%"
 				@click:row="onRowClick"
+				@pointerdown.native="onSwipeStart"
 			>
 				<template v-slot:group.header="{ group, items, isOpen, toggle, headers: hdrs }">
 					<tr class="v-row-group__header tw-group-row">
@@ -223,6 +224,7 @@
 					<span
 						class="tw-description tw-description--clickable"
 						title="Edit task"
+						:data-task-uuid="item.uuid"
 						@click="onDescriptionClick($event, item)"
 					>
 						<span v-html="linkify(item.description)" />
@@ -462,7 +464,7 @@ export default defineComponent({
 			{ text: 'Until', value: 'until', ...hide('sm') },
 			{ text: 'Tags', value: 'tags', ...hide('xs') },
 			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, ...hide('sm') },
-			{ text: 'Actions', value: 'actions', sortable: false }
+			{ text: 'Actions', value: 'actions', sortable: false, ...hide('xs') }
 		]);
 
 		const filteredHeaders = computed(() =>
@@ -925,8 +927,108 @@ export default defineComponent({
 			}
 		};
 
-		onMounted(() => window.addEventListener('keydown', onGridKeydown));
-		onBeforeUnmount(() => window.removeEventListener('keydown', onGridKeydown));
+		// ── Swipe gestures (mobile) ──────────────────────────────────────────
+		// Swipe right → complete (or restore); swipe left → delete (or stop
+		// recurring series). Only fires on touch/pen pointers; mouse keeps
+		// using the existing buttons.
+		const SWIPE_DIRECTION_LOCK = 8;
+		const SWIPE_TRANSLATE_CAP = 100;
+		const SWIPE_ACTION_THRESHOLD = 80;
+		type SwipeState = {
+			tr: HTMLElement;
+			uuid: string;
+			startX: number;
+			startY: number;
+			direction: 'h' | 'v' | null;
+		};
+		let swipeState: SwipeState | null = null;
+
+		const swipeCleanup = (tr: HTMLElement) => {
+			tr.style.transform = '';
+			tr.style.transition = '';
+			tr.classList.remove('tw-row--swipe-right', 'tw-row--swipe-left', 'tw-row--swipe-armed');
+		};
+
+		const onSwipeStart = (e: PointerEvent) => {
+			if (!isMobile.value) return;
+			if (e.pointerType === 'mouse') return;
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+			// Don't swipe when starting on an interactive control or pagination row
+			if (target.closest('button, a, .v-data-footer, thead')) return;
+			const tr = target.closest('tr') as HTMLElement | null;
+			if (!tr || tr.classList.contains('v-row-group__header')) return;
+			const uuidEl = tr.querySelector('[data-task-uuid]') as HTMLElement | null;
+			const uuid = uuidEl?.dataset.taskUuid;
+			if (!uuid) return;
+			swipeState = { tr, uuid, startX: e.clientX, startY: e.clientY, direction: null };
+		};
+
+		const onSwipeMove = (e: PointerEvent) => {
+			if (!swipeState) return;
+			const dx = e.clientX - swipeState.startX;
+			const dy = e.clientY - swipeState.startY;
+			if (swipeState.direction === null) {
+				if (Math.abs(dx) > SWIPE_DIRECTION_LOCK && Math.abs(dx) > Math.abs(dy)) {
+					swipeState.direction = 'h';
+				}
+				else if (Math.abs(dy) > SWIPE_DIRECTION_LOCK) {
+					swipeState = null;
+					return;
+				}
+				else {
+					return;
+				}
+			}
+			const tr = swipeState.tr;
+			const capped = Math.max(-SWIPE_TRANSLATE_CAP, Math.min(SWIPE_TRANSLATE_CAP, dx));
+			tr.style.transform = `translateX(${capped}px)`;
+			const armed = Math.abs(dx) > SWIPE_ACTION_THRESHOLD;
+			tr.classList.toggle('tw-row--swipe-right', dx > 0);
+			tr.classList.toggle('tw-row--swipe-left', dx < 0);
+			tr.classList.toggle('tw-row--swipe-armed', armed);
+		};
+
+		const onSwipeEnd = (e: PointerEvent) => {
+			if (!swipeState) return;
+			const s = swipeState;
+			swipeState = null;
+			const dx = e.clientX - s.startX;
+			const armed = s.direction === 'h' && Math.abs(dx) >= SWIPE_ACTION_THRESHOLD;
+			s.tr.style.transition = 'transform 180ms ease, background-color 180ms ease';
+			s.tr.style.transform = '';
+			window.setTimeout(() => swipeCleanup(s.tr), 220);
+			if (!armed) return;
+			const item = currentItems.value.find(i => i.uuid === s.uuid);
+			if (!item) return;
+			if (dx > 0) {
+				if (item.status === 'pending') completeTasks([item]);
+				else if (item.status === 'completed' || item.status === 'deleted') restoreTasks([item]);
+			}
+			else {
+				onRowDelete(item);
+			}
+		};
+
+		const onSwipeCancel = () => {
+			if (!swipeState) return;
+			const tr = swipeState.tr;
+			swipeState = null;
+			swipeCleanup(tr);
+		};
+
+		onMounted(() => {
+			window.addEventListener('keydown', onGridKeydown);
+			window.addEventListener('pointermove', onSwipeMove);
+			window.addEventListener('pointerup', onSwipeEnd);
+			window.addEventListener('pointercancel', onSwipeCancel);
+		});
+		onBeforeUnmount(() => {
+			window.removeEventListener('keydown', onGridKeydown);
+			window.removeEventListener('pointermove', onSwipeMove);
+			window.removeEventListener('pointerup', onSwipeEnd);
+			window.removeEventListener('pointercancel', onSwipeCancel);
+		});
 
 		const tabCount = (st: string): number => {
 			const bucket: any = (classifiedTasks as any)[st];
@@ -992,6 +1094,7 @@ export default defineComponent({
 			clearFilters,
 			showProfileChip,
 			isMobile,
+			onSwipeStart,
 
 			ConfirmationDialog,
 			ColumnDialog

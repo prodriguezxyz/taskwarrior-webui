@@ -1907,6 +1907,63 @@ button.tw-icon-btn:focus-visible {
 	}
 }
 
+/* Swipe gestures — only relevant on touch screens, but the styles are
+   triggered by JS class toggles so we keep them outside the media query. */
+.v-application .tw-table tbody tr.tw-row--swipe-right > td,
+.v-application .tw-table tbody tr.tw-row--swipe-left > td {
+	transition: background-color 120ms ease;
+}
+
+.v-application .tw-table tbody tr.tw-row--swipe-right > td {
+	background: var(--tw-success-soft) !important;
+}
+.v-application .tw-table tbody tr.tw-row--swipe-left > td {
+	background: var(--tw-danger-soft) !important;
+}
+.v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-right > td {
+	background: rgba(5, 150, 105, 0.22) !important;
+}
+.v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-left > td {
+	background: rgba(220, 38, 38, 0.18) !important;
+}
+
+/* Reveal an action icon on the leading edge of the swiped row. */
+.v-application .tw-table tbody tr.tw-row--swipe-right,
+.v-application .tw-table tbody tr.tw-row--swipe-left {
+	position: relative;
+}
+
+.v-application .tw-table tbody tr.tw-row--swipe-right::before,
+.v-application .tw-table tbody tr.tw-row--swipe-left::before {
+	font-family: 'Material Design Icons';
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	font-size: 22px;
+	line-height: 1;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.v-application .tw-table tbody tr.tw-row--swipe-right::before {
+	content: '\F05E0'; /* mdi-check-circle */
+	left: 16px;
+	color: var(--tw-success);
+}
+
+.v-application .tw-table tbody tr.tw-row--swipe-left::before {
+	content: '\F09E7'; /* mdi-delete-outline */
+	right: 16px;
+	color: var(--tw-danger);
+}
+
+/* Allow vertical scroll while we capture horizontal pans for swipe. */
+@media (hover: none) {
+	.v-application .tw-table tbody tr:not(.v-row-group__header) {
+		touch-action: pan-y;
+	}
+}
+
 /* Responsive — Vuetify's smAndDown breakpoint is <960px; we mirror it here. */
 
 /* Column visibility helpers — applied via header.class / cellClass in TaskList */
