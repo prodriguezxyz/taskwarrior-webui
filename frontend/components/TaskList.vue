@@ -334,7 +334,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, computed, reactive, ref, watch, ComputedRef, Ref, onMounted, onBeforeUnmount, nextTick, inject } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, reactive, ref, watch, Ref, onMounted, onBeforeUnmount, nextTick, inject } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
 import ConfirmationDialog from '../components/ConfirmationDialog.vue';
@@ -571,60 +571,63 @@ export default defineComponent({
 
 		const isOverdue = (task: Task) => !!task.due && moment(task.due).isBefore(moment());
 
-		const tempTasks: { [key: string]: ComputedRef<Task[]> } = {};
-		for (const status of classifiedStatuses) {
-			tempTasks[status] = computed((): Task[] => {
-				const endOfToday = status === 'today' ? moment().endOf('day') : null;
-				const filtered = props.tasks?.filter(task => {
+		// All status buckets in one computed map: simpler reactivity than a
+		// reactive() of refs, which had inconsistent unwrapping under Vue 2 +
+		// composition-api and broke list refresh after multi-profile writes.
+		const classifiedTasks = computed((): Record<string, Task[]> => {
+			const out: Record<string, Task[]> = {};
+			const tasks = props.tasks ?? [];
+			const endOfToday = moment().endOf('day');
+
+			for (const st of classifiedStatuses) {
+				const filtered = tasks.filter(task => {
 					let passStatus: boolean;
-					if (status === 'today') {
+					if (st === 'today') {
 						const waiting = (task.wait && !expiredDate(task.wait))
 							|| (task.scheduled && futureDate(task.scheduled));
 						passStatus = task.status === 'pending'
 							&& !waiting
 							&& task.due !== undefined
-							&& moment(task.due).isSameOrBefore(endOfToday!);
+							&& moment(task.due).isSameOrBefore(endOfToday);
 					}
-					else if (status === 'waiting' || status === 'pending') {
+					else if (st === 'waiting' || st === 'pending') {
 						const waiting = (task.wait && !expiredDate(task.wait))
 							|| (task.scheduled && futureDate(task.scheduled));
-						passStatus = task.status === 'pending' && (status === 'pending' ? !waiting : !!waiting);
+						passStatus = task.status === 'pending' && (st === 'pending' ? !waiting : !!waiting);
 					}
 					else {
-						passStatus = task.status === status;
+						passStatus = task.status === st;
 					}
 					if (!passStatus) return false;
 					// Inbox scope: when no project/tag filter and not the today/mine bucket,
 					// only unprojected non-recurring tasks. Recurring child instances
 					// (task.parent set) are already-triaged routines, not inbox items.
 					if (!projectFilter.value && !sidebarTagFilter.value && view.value !== 'mine'
-						&& status !== 'today' && (task.project || (task as any).parent)) return false;
+						&& st !== 'today' && (task.project || (task as any).parent)) return false;
 					return matchesFilters(task);
-				}) || [];
+				});
 
-				if (status === 'today' || status === 'pending') {
-					const todayGroup = status === 'today' ? 'Today' : 'Upcoming';
-					return filtered.map(t => ({
+				if (st === 'today' || st === 'pending') {
+					const todayGroup = st === 'today' ? 'Today' : 'Upcoming';
+					out[st] = filtered.map(t => ({
 						...t,
 						_group: isOverdue(t) ? 'Overdue' : todayGroup
 					})) as Task[];
 				}
-				return filtered as Task[];
-			});
-		}
-		const classifiedTasks = reactive(tempTasks);
-
-		const currentItems = computed((): Task[] => {
-			const bucket: any = (classifiedTasks as any)[status.value];
-			return Array.isArray(bucket) ? bucket : (bucket?.value || []);
+				else {
+					out[st] = filtered as Task[];
+				}
+			}
+			return out;
 		});
+
+		const currentItems = computed((): Task[] => classifiedTasks.value[status.value] || []);
 
 		const groupBy = computed((): string | undefined => {
 			if (!projectFilter.value && !sidebarTagFilter.value) return undefined;
 			if (status.value !== 'today' && status.value !== 'pending') return undefined;
-			const bucket: any = (classifiedTasks as any)[status.value];
-			const arr: any[] = Array.isArray(bucket) ? bucket : (bucket?.value || []);
-			const groups = new Set(arr.map(t => t._group));
+			const arr = classifiedTasks.value[status.value] || [];
+			const groups = new Set(arr.map((t: any) => t._group));
 			return groups.size > 1 ? '_group' : undefined;
 		});
 
@@ -1085,13 +1088,7 @@ export default defineComponent({
 			detachSwipeListeners();
 		});
 
-		const tabCount = (st: string): number => {
-			const bucket: any = (classifiedTasks as any)[st];
-			if (!bucket) return 0;
-			// reactive wraps ComputedRef; handle both shapes
-			const arr = Array.isArray(bucket) ? bucket : bucket.value;
-			return arr ? arr.length : 0;
-		};
+		const tabCount = (st: string): number => classifiedTasks.value[st]?.length ?? 0;
 
 		return {
 			linkify,
