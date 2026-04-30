@@ -44,6 +44,16 @@ The container fails to start if `AUTH_MODE=cloudflare` and either env var is mis
 
 For local development (`npm run dev`), set `AUTH_MODE=dev` to bypass Cloudflare; see `CLAUDE.md`.
 
+### Session duration (how often re-auth is required)
+
+The backend only verifies the JWT — Cloudflare decides how long it lives. Default is 24h, which is why the app prompts to log in roughly daily. To extend it:
+
+1. Cloudflare dashboard → **Zero Trust → Settings → Authentication → Global session timeout** (raise this first if needed; it caps every app).
+2. **Zero Trust → Access → Applications → [the taskwarrior app] → Edit → Settings → Session Duration**.
+3. Pick a longer value (e.g. `1 week` or `1 month`). Save.
+
+No code change, no redeploy. The app session can never exceed the global timeout, so if you want a 1-month app session, the global must be ≥ 1 month too.
+
 ## Users
 
 Each authenticated email is mapped to a list of profiles in `users.json`. The backend reads it from `USERS_CONFIG` (default `/users.json`) and rejects any authenticated email that is not provisioned (HTTP 403).
