@@ -79,8 +79,10 @@
 					<kbd>p1-p4</kbd>
 					<kbd>today</kbd>
 					<kbd>tomorrow</kbd>
-					<kbd>mon-sun</kbd>
+					<kbd>monday</kbd>
+					<kbd>next mon</kbd>
 					<kbd>+3d</kbd>
+					<kbd>eow</kbd>
 				</span>
 				<span class="tw-palette__hint-keys">
 					<kbd>↵</kbd>
@@ -105,27 +107,65 @@ const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
 	'4': undefined
 };
 
-const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const DAY_NAMES_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const DAY_NAMES_FULL = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+function dayIndexOf(tok: string): number {
+	const lower = tok.toLowerCase();
+	const full = DAY_NAMES_FULL.indexOf(lower);
+	if (full !== -1) return full;
+	return DAY_NAMES_SHORT.indexOf(lower);
+}
+
+function dayOfWeekFrom(targetDow: number, weeksAhead = 0): moment.Moment {
+	const m = moment();
+	const today = m.day();
+	let diff = targetDow - today;
+	if (diff <= 0) diff += 7;
+	diff += 7 * weeksAhead;
+	return m.add(diff, 'day').endOf('day');
+}
 
 function parseDateToken(tok: string): string | undefined {
 	const lower = tok.toLowerCase();
-	if (lower === 'today') return moment().endOf('day').toISOString();
-	if (lower === 'tomorrow' || lower === 'tom') return moment().add(1, 'day').endOf('day').toISOString();
 
-	const dayIdx = DAY_NAMES.indexOf(lower);
-	if (dayIdx !== -1) {
-		const result = moment();
-		const todayDow = result.day();
-		let diff = dayIdx - todayDow;
-		if (diff <= 0) diff += 7;
-		return result.add(diff, 'day').endOf('day').toISOString();
+	if (lower === 'today') return moment().endOf('day').toISOString();
+	if (lower === 'tomorrow') return moment().add(1, 'day').endOf('day').toISOString();
+
+	if (lower === 'eod') return moment().endOf('day').toISOString();
+	if (lower === 'eow') return moment().endOf('isoWeek').toISOString();
+	if (lower === 'eom') return moment().endOf('month').toISOString();
+	if (lower === 'eoy') return moment().endOf('year').toISOString();
+	if (lower === 'weekend') return dayOfWeekFrom(6).toISOString();
+
+	// "next monday", "next mon", "this monday" come in pre-merged as "nextmonday" / "thismon"
+	let weekOffset = 0;
+	let dayTok = lower;
+	if (lower.startsWith('next')) {
+		weekOffset = 1;
+		dayTok = lower.slice(4);
+	}
+	else if (lower.startsWith('this')) {
+		weekOffset = 0;
+		dayTok = lower.slice(4);
 	}
 
-	const relMatch = /^\+(\d+)([dw])$/.exec(lower);
+	if (weekOffset === 1 && dayTok === 'week') return moment().add(1, 'week').endOf('day').toISOString();
+	if (weekOffset === 1 && dayTok === 'month') return moment().add(1, 'month').endOf('day').toISOString();
+
+	const dayIdx = dayIndexOf(dayTok);
+	if (dayIdx !== -1) return dayOfWeekFrom(dayIdx, weekOffset).toISOString();
+
+	const relMatch = /^\+(\d+)([dwmy])$/.exec(lower);
 	if (relMatch) {
 		const n = parseInt(relMatch[1], 10);
-		const unit = relMatch[2] === 'd' ? 'days' : 'weeks';
-		return moment().add(n, unit).endOf('day').toISOString();
+		const unitMap: Record<string, moment.unitOfTime.DurationConstructor> = {
+			d: 'days',
+			w: 'weeks',
+			m: 'months',
+			y: 'years'
+		};
+		return moment().add(n, unitMap[relMatch[2]]).endOf('day').toISOString();
 	}
 
 	if (/^\d{4}-\d{2}-\d{2}$/.test(lower)) {
@@ -146,7 +186,26 @@ interface Parsed {
 
 function parseQuickAdd(input: string): Parsed {
 	const out: Parsed = { description: '', tags: [] };
-	const tokens = input.split(/\s+/);
+	const raw = input.split(/\s+/).filter(Boolean);
+
+	// Merge "next <day|week|month>" and "this <day>" into one token so parseDateToken can handle them.
+	const tokens: string[] = [];
+	for (let i = 0; i < raw.length; i++) {
+		const cur = raw[i];
+		const lower = cur.toLowerCase();
+		const peek = raw[i + 1]?.toLowerCase();
+		if ((lower === 'next' || lower === 'this') && peek) {
+			const isDay = dayIndexOf(peek) !== -1;
+			const isPeriod = lower === 'next' && (peek === 'week' || peek === 'month');
+			if (isDay || isPeriod) {
+				tokens.push(`${lower}${peek}`);
+				i++;
+				continue;
+			}
+		}
+		tokens.push(cur);
+	}
+
 	const remaining: string[] = [];
 
 	for (const tok of tokens) {
@@ -181,8 +240,12 @@ function parseQuickAdd(input: string): Parsed {
 function displayDate(str?: string) {
 	if (!str) return '';
 	const date = moment(str);
-	const diff = moment.duration(date.diff(moment()));
-	if (Math.abs(diff.asDays()) < 1) return diff.humanize(true);
+	const today = moment().startOf('day');
+	const diffDays = date.startOf('day').diff(today, 'days');
+	if (diffDays === 0) return 'today';
+	if (diffDays === 1) return 'tomorrow';
+	if (diffDays === -1) return 'yesterday';
+	if (diffDays > 1 && diffDays < 7) return date.format('dddd');
 	return date.format('YYYY-MM-DD');
 }
 
