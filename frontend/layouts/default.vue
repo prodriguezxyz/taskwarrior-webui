@@ -36,47 +36,45 @@
 		</v-snackbar>
 
 		<v-app-bar height="52px" fixed app flat>
-			<div
+			<button
 				v-if="isMobile"
+				type="button"
 				class="tw-icon-btn tw-icon-btn--menu"
-				role="button"
-				tabindex="0"
 				title="Menu"
 				aria-label="Toggle navigation"
+				:aria-expanded="mobileDrawer"
 				@click="mobileDrawer = !mobileDrawer"
-				@keydown.enter="mobileDrawer = !mobileDrawer"
 			>
-				<v-icon size="20">mdi-menu</v-icon>
-			</div>
+				<v-icon size="20" aria-hidden="true">mdi-menu</v-icon>
+			</button>
 
 			<div class="tw-wordmark">
-				<span class="tw-wordmark__dot" />
+				<span class="tw-wordmark__dot" aria-hidden="true" />
 				<span>Taskwarrior</span>
 			</div>
 
 			<v-spacer />
 
-			<div
+			<button
+				type="button"
 				class="tw-icon-btn"
-				role="button"
-				tabindex="0"
 				:title="dark ? 'Light theme' : 'Dark theme'"
+				:aria-label="dark ? 'Switch to light theme' : 'Switch to dark theme'"
+				:aria-pressed="dark"
 				@click="dark = !dark"
-				@keydown.enter="dark = !dark"
 			>
-				<v-icon size="18">{{ dark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
-			</div>
+				<v-icon size="18" aria-hidden="true">{{ dark ? 'mdi-weather-sunny' : 'mdi-weather-night' }}</v-icon>
+			</button>
 
-			<div
+			<button
+				type="button"
 				class="tw-icon-btn"
-				role="button"
-				tabindex="0"
 				title="Settings"
+				aria-label="Open settings"
 				@click="settingsDialog = true"
-				@keydown.enter="settingsDialog = true"
 			>
-				<v-icon size="18">mdi-cog-outline</v-icon>
-			</div>
+				<v-icon size="18" aria-hidden="true">mdi-cog-outline</v-icon>
+			</button>
 		</v-app-bar>
 
 		<v-navigation-drawer
@@ -113,9 +111,9 @@
 					title="New task (q)"
 					@click="openNewTask"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--primary">mdi-plus-circle</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--primary" aria-hidden="true">mdi-plus-circle</v-icon>
 					<span class="tw-sidebar__label">Add task</span>
-					<span class="tw-sidebar__shortcut">q</span>
+					<span class="tw-sidebar__shortcut" aria-hidden="true">q</span>
 				</button>
 
 				<button
@@ -124,12 +122,12 @@
 					title="Search (/ or Ctrl+K)"
 					@click="openSearch"
 				>
-					<v-icon size="16" class="tw-sidebar__icon">mdi-magnify</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon" aria-hidden="true">mdi-magnify</v-icon>
 					<span class="tw-sidebar__label">Search</span>
-					<span class="tw-sidebar__shortcut">/</span>
+					<span class="tw-sidebar__shortcut" aria-hidden="true">/</span>
 				</button>
 
-				<div class="tw-sidebar__divider" />
+				<div class="tw-sidebar__divider" aria-hidden="true" />
 
 				<button
 					type="button"
@@ -137,7 +135,7 @@
 					:class="{ 'tw-sidebar__item--active': view === 'all' && !projectFilter && !tagFilter }"
 					@click="selectInbox"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--inbox">mdi-inbox-outline</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--inbox" aria-hidden="true">mdi-inbox-outline</v-icon>
 					<span class="tw-sidebar__label">Inbox</span>
 					<span class="tw-sidebar__count">{{ totalPending }}</span>
 				</button>
@@ -148,7 +146,7 @@
 					:class="{ 'tw-sidebar__item--active': view === 'today' }"
 					@click="selectToday"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today">mdi-calendar-today</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--today" aria-hidden="true">mdi-calendar-today</v-icon>
 					<span class="tw-sidebar__label">Today</span>
 					<span v-if="todayCount > 0" class="tw-sidebar__count tw-sidebar__count--today">{{ todayCount }}</span>
 				</button>
@@ -160,7 +158,7 @@
 					:class="{ 'tw-sidebar__item--active': view === 'mine' }"
 					@click="selectMine"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--mine">mdi-account-outline</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--mine" aria-hidden="true">mdi-account-outline</v-icon>
 					<span class="tw-sidebar__label">Assigned to me</span>
 					<span v-if="mineCount > 0" class="tw-sidebar__count tw-sidebar__count--mine">{{ mineCount }}</span>
 				</button>
@@ -171,7 +169,7 @@
 					:class="{ 'tw-sidebar__item--active': view === 'tags' || (view === 'all' && tagFilter) }"
 					@click="selectTagsIndex"
 				>
-					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--tag">mdi-tag-multiple-outline</v-icon>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--tag" aria-hidden="true">mdi-tag-multiple-outline</v-icon>
 					<span class="tw-sidebar__label">Tags</span>
 					<span v-if="totalTags > 0" class="tw-sidebar__count">{{ totalTags }}</span>
 				</button>
@@ -197,7 +195,7 @@
 							:class="{ 'tw-sidebar__item--active': view === 'all' && projectFilter === p.name }"
 							@click="setProject(p.name)"
 						>
-							<v-icon size="16" class="tw-sidebar__icon">mdi-folder-outline</v-icon>
+							<v-icon size="16" class="tw-sidebar__icon" aria-hidden="true">mdi-folder-outline</v-icon>
 							<span class="tw-sidebar__label">{{ p.name }}</span>
 							<span v-if="p.count > 0" class="tw-sidebar__count tw-sidebar__project-count">{{ p.count }}</span>
 						</button>
@@ -205,9 +203,10 @@
 							type="button"
 							class="tw-sidebar__project-edit"
 							title="Rename or delete project"
+							:aria-label="`Manage project ${p.name}`"
 							@click.stop="manageProject(p.name)"
 						>
-							<v-icon size="14">mdi-dots-horizontal</v-icon>
+							<v-icon size="14" aria-hidden="true">mdi-dots-horizontal</v-icon>
 						</button>
 					</div>
 				</div>

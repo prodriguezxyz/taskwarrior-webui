@@ -36,7 +36,10 @@
 						<v-list-item-action>
 							<v-text-field
 								v-model="settings.autoRefresh"
-								style="width: 40px"
+								type="number"
+								inputmode="numeric"
+								min="0"
+								style="width: 56px"
 								:rules="numberRules"
 							/>
 						</v-list-item-action>
@@ -46,9 +49,15 @@
 						<v-list-item-content>
 							<v-list-item-title class="pb-1">
 								Auto Sync
-								<v-icon size="18px" class="ml-2" @click="sync" title="Sync immediately">
-									mdi-sync
-								</v-icon>
+								<button
+									type="button"
+									class="tw-icon-btn tw-icon-btn--inline"
+									title="Sync immediately"
+									aria-label="Sync now"
+									@click="sync"
+								>
+									<v-icon size="18px" aria-hidden="true">mdi-sync</v-icon>
+								</button>
 							</v-list-item-title>
 							<v-list-item-subtitle>
 								in minutes (0 means no auto sync)<br />
@@ -58,7 +67,10 @@
 						<v-list-item-action>
 							<v-text-field
 								v-model="settings.autoSync"
-								style="width: 40px"
+								type="number"
+								inputmode="numeric"
+								min="0"
+								style="width: 56px"
 								:rules="numberRules"
 							/>
 						</v-list-item-action>

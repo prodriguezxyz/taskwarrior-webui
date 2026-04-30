@@ -8,15 +8,18 @@
 	>
 		<div class="tw-palette" role="dialog" aria-label="Search tasks">
 			<div class="tw-palette__inputwrap">
-				<v-icon size="18" class="tw-palette__icon">mdi-magnify</v-icon>
+				<v-icon size="18" class="tw-palette__icon" aria-hidden="true">mdi-magnify</v-icon>
 				<input
 					ref="inputRef"
 					v-model="query"
-					type="text"
+					type="search"
 					class="tw-palette__input"
+					aria-label="Search tasks"
 					placeholder="Search tasks, projects, tags…"
 					autocomplete="off"
 					spellcheck="false"
+					inputmode="search"
+					enterkeyhint="search"
 					@keydown.down.prevent="move(1)"
 					@keydown.up.prevent="move(-1)"
 					@keydown.enter.prevent="choose(results[activeIdx])"
@@ -30,7 +33,7 @@
 					:aria-pressed="includeArchived"
 					@click="includeArchived = !includeArchived"
 				>
-					<v-icon size="14">mdi-archive-outline</v-icon>
+					<v-icon size="14" aria-hidden="true">mdi-archive-outline</v-icon>
 					<span class="tw-palette__toggle-label">Archived</span>
 				</button>
 				<button
@@ -38,9 +41,10 @@
 					type="button"
 					class="tw-palette__clear"
 					title="Clear"
+					aria-label="Clear search"
 					@click="query = ''"
 				>
-					<v-icon size="14">mdi-close</v-icon>
+					<v-icon size="14" aria-hidden="true">mdi-close</v-icon>
 				</button>
 			</div>
 
@@ -56,7 +60,7 @@
 					@mouseenter="activeIdx = i"
 					@click="choose(task)"
 				>
-					<v-icon size="14" class="tw-palette__item-icon" :class="'tw-palette__item-icon--' + statusKey(task)">
+					<v-icon size="14" class="tw-palette__item-icon" :class="'tw-palette__item-icon--' + statusKey(task)" aria-hidden="true">
 						{{ statusIcon(task) }}
 					</v-icon>
 					<span class="tw-palette__item-desc" v-html="highlight(task.description || '')" />
@@ -64,7 +68,7 @@
 						{{ task._profile }}
 					</span>
 					<span v-if="task.project" class="tw-palette__item-meta">
-						<v-icon size="11" class="tw-palette__item-meta-icon">mdi-folder-outline</v-icon>
+						<v-icon size="11" class="tw-palette__item-meta-icon" aria-hidden="true">mdi-folder-outline</v-icon>
 						{{ task.project }}
 					</span>
 					<span v-if="task.tags && task.tags.length" class="tw-palette__item-tags">
@@ -73,7 +77,7 @@
 						</span>
 					</span>
 					<span v-if="task.due" class="tw-palette__item-due">
-						<v-icon size="11">mdi-calendar</v-icon>
+						<v-icon size="11" aria-hidden="true">mdi-calendar</v-icon>
 						{{ displayDate(task.due) }}
 					</span>
 				</button>

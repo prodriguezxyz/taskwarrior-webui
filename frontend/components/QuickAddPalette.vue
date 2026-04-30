@@ -8,15 +8,17 @@
 	>
 		<div class="tw-palette tw-quickadd" role="dialog" aria-label="Add task">
 			<div class="tw-palette__inputwrap">
-				<v-icon size="18" class="tw-palette__icon">mdi-plus-circle-outline</v-icon>
+				<v-icon size="18" class="tw-palette__icon" aria-hidden="true">mdi-plus-circle-outline</v-icon>
 				<input
 					ref="inputRef"
 					v-model="text"
 					type="text"
 					class="tw-palette__input"
-					placeholder="Buy milk #shopping @errands tomorrow p2"
+					aria-label="Quick add task"
+					placeholder="Buy milk #shopping @errands tomorrow p2…"
 					autocomplete="off"
 					spellcheck="false"
+					enterkeyhint="done"
 					@keydown.down.prevent="onDown"
 					@keydown.up.prevent="onUp"
 					@keydown.tab.prevent="onTab"
@@ -39,7 +41,7 @@
 					@mouseenter="activeIdx = i"
 					@mousedown.prevent="applySuggestion(s)"
 				>
-					<v-icon size="14" class="tw-palette__item-icon">
+					<v-icon size="14" class="tw-palette__item-icon" aria-hidden="true">
 						{{ suggestionType === 'project' ? 'mdi-folder-outline' : 'mdi-tag-outline' }}
 					</v-icon>
 					<span class="tw-palette__item-desc">{{ s }}</span>
@@ -48,7 +50,7 @@
 
 			<div v-if="hasParsedMeta" class="tw-quickadd__preview">
 				<span v-if="parsed.project" class="tw-quickadd__chip">
-					<v-icon size="12">mdi-folder-outline</v-icon>
+					<v-icon size="12" aria-hidden="true">mdi-folder-outline</v-icon>
 					{{ parsed.project }}
 				</span>
 				<span
@@ -56,7 +58,7 @@
 					:key="'tag-' + t"
 					class="tw-quickadd__chip"
 				>
-					<v-icon size="12">mdi-tag-outline</v-icon>
+					<v-icon size="12" aria-hidden="true">mdi-tag-outline</v-icon>
 					{{ t }}
 				</span>
 				<span
@@ -67,7 +69,7 @@
 					P{{ parsed.priority }}
 				</span>
 				<span v-if="parsed.due" class="tw-quickadd__chip">
-					<v-icon size="12">mdi-calendar</v-icon>
+					<v-icon size="12" aria-hidden="true">mdi-calendar</v-icon>
 					{{ displayDate(parsed.due) }}
 				</span>
 			</div>

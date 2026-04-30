@@ -21,7 +21,7 @@
 					:class="{ 'tw-tab--active': st === status }"
 					@click="selectStatus(st)"
 				>
-					<v-icon size="15" class="tw-tab__icon">
+					<v-icon size="15" class="tw-tab__icon" aria-hidden="true">
 						{{ statusIcons[st] }}
 					</v-icon>
 					<span class="tw-tab__label">{{ statusLabels[st] }}</span>
@@ -40,18 +40,21 @@
 					class="tw-action tw-action--ghost"
 					:class="{ 'tw-action--on': showFilters || hasActiveFilters }"
 					title="Filters"
+					aria-label="Toggle filters"
+					:aria-pressed="showFilters"
 					@click="showFilters = !showFilters"
 				>
-					<v-icon size="18">mdi-filter-variant</v-icon>
+					<v-icon size="18" aria-hidden="true">mdi-filter-variant</v-icon>
 				</button>
 
 				<button
 					type="button"
 					class="tw-action tw-action--ghost"
 					title="Refresh"
+					aria-label="Refresh tasks"
 					@click="refresh"
 				>
-					<v-icon size="18">mdi-refresh</v-icon>
+					<v-icon size="18" aria-hidden="true">mdi-refresh</v-icon>
 				</button>
 
 				<button
@@ -59,18 +62,20 @@
 					type="button"
 					class="tw-action tw-action--ghost"
 					title="Sync"
+					aria-label="Sync"
 					@click="syncTasks"
 				>
-					<v-icon size="18">mdi-sync</v-icon>
+					<v-icon size="18" aria-hidden="true">mdi-sync</v-icon>
 				</button>
 
 				<button
 					type="button"
 					class="tw-action tw-action--ghost"
 					title="Configure columns"
+					aria-label="Configure columns"
 					@click="showColumnDialog = true"
 				>
-					<v-icon size="18">mdi-view-column-outline</v-icon>
+					<v-icon size="18" aria-hidden="true">mdi-view-column-outline</v-icon>
 				</button>
 			</div>
 		</div>
@@ -147,7 +152,7 @@
 					class="tw-btn tw-btn--ghost"
 					@click="completeTasks(selected)"
 				>
-					<v-icon size="16" left>mdi-check</v-icon>
+					<v-icon size="16" left aria-hidden="true">mdi-check</v-icon>
 					Complete
 				</button>
 				<button
@@ -156,7 +161,7 @@
 					class="tw-btn tw-btn--ghost"
 					@click="restoreTasks(selected)"
 				>
-					<v-icon size="16" left>mdi-restore</v-icon>
+					<v-icon size="16" left aria-hidden="true">mdi-restore</v-icon>
 					Restore
 				</button>
 				<button
@@ -165,7 +170,7 @@
 					class="tw-btn tw-btn--ghost tw-btn--danger"
 					@click="onBulkDelete(selected)"
 				>
-					<v-icon size="16" left>mdi-delete-outline</v-icon>
+					<v-icon size="16" left aria-hidden="true">mdi-delete-outline</v-icon>
 					{{ status === 'recurring' ? 'Stop series' : 'Delete' }}
 				</button>
 			</div>
@@ -191,7 +196,7 @@
 								:class="{ 'tw-group-header__toggle--overdue': group === 'Overdue' }"
 								@click="toggle"
 							>
-								<v-icon size="14">{{ isOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+								<v-icon size="14" aria-hidden="true">{{ isOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
 								<span>{{ group }}</span>
 								<span class="tw-group-header__count">{{ items.length }}</span>
 							</button>
@@ -205,10 +210,11 @@
 						class="tw-complete"
 						:class="completeBtnClass(item)"
 						:title="completeBtnTitle(item)"
+						:aria-label="completeBtnTitle(item)"
 						@click="onCompleteClick($event, item)"
 					>
-						<v-icon size="18" class="tw-complete__icon">{{ completeBtnIcon(item) }}</v-icon>
-						<v-icon size="14" class="tw-complete__hover-icon">mdi-check</v-icon>
+						<v-icon size="18" class="tw-complete__icon" aria-hidden="true">{{ completeBtnIcon(item) }}</v-icon>
+						<v-icon size="14" class="tw-complete__hover-icon" aria-hidden="true">mdi-check</v-icon>
 					</button>
 				</template>
 
@@ -228,7 +234,7 @@
 						</span>
 						<div class="tw-description__sub">
 							<span v-if="item.project" class="tw-description__sub-meta">
-								<v-icon size="11">mdi-folder-outline</v-icon>
+								<v-icon size="11" aria-hidden="true">mdi-folder-outline</v-icon>
 								{{ item.project }}
 							</span>
 							<span
@@ -236,7 +242,7 @@
 								class="tw-description__sub-meta"
 								:class="dueMetaClass(item)"
 							>
-								<v-icon size="11">mdi-calendar-outline</v-icon>
+								<v-icon size="11" aria-hidden="true">mdi-calendar-outline</v-icon>
 								{{ displayDate(item.due) }}
 							</span>
 							<span
@@ -291,32 +297,35 @@
 				</template>
 
 				<template v-slot:item.actions="{ item }">
-					<v-icon
-						class="ml-2 tw-rowaction tw-rowaction--edit"
-						size="20px"
-						@click="onActionClick($event, () => editTask(item))"
+					<button
+						type="button"
+						class="tw-rowaction tw-rowaction--edit"
 						title="Edit"
+						aria-label="Edit task"
+						@click="onActionClick($event, () => editTask(item))"
 					>
-						mdi-pencil
-					</v-icon>
-					<v-icon
+						<v-icon size="20px" aria-hidden="true">mdi-pencil</v-icon>
+					</button>
+					<button
 						v-if="item.parent && status !== 'deleted'"
-						class="ml-2 tw-rowaction tw-rowaction--stop"
-						size="20px"
-						@click="onActionClick($event, () => confirmDeleteSeries([item]))"
+						type="button"
+						class="tw-rowaction tw-rowaction--stop"
 						title="Stop recurring series"
+						aria-label="Stop recurring series"
+						@click="onActionClick($event, () => confirmDeleteSeries([item]))"
 					>
-						mdi-restart-off
-					</v-icon>
-					<v-icon
+						<v-icon size="20px" aria-hidden="true">mdi-restart-off</v-icon>
+					</button>
+					<button
 						v-show="status !== 'deleted'"
-						class="ml-2 tw-rowaction tw-rowaction--delete"
-						size="20px"
-						@click="onActionClick($event, () => onRowDelete(item))"
+						type="button"
+						class="tw-rowaction tw-rowaction--delete"
 						:title="item.status === 'recurring' ? 'Stop recurring series' : 'Delete'"
+						:aria-label="item.status === 'recurring' ? 'Stop recurring series' : 'Delete task'"
+						@click="onActionClick($event, () => onRowDelete(item))"
 					>
-						mdi-delete
-					</v-icon>
+						<v-icon size="20px" aria-hidden="true">mdi-delete</v-icon>
+					</button>
 				</template>
 			</v-data-table>
 		</div>
