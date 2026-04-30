@@ -26,8 +26,10 @@
 	--tw-warning-soft: rgba(217, 119, 6, 0.1);
 	--tw-success: #059669;
 	--tw-success-soft: rgba(5, 150, 105, 0.1);
+	--tw-success-armed: rgba(5, 150, 105, 0.22);
 	--tw-info: #2563EB;
 	--tw-info-soft: rgba(37, 99, 235, 0.1);
+	--tw-danger-armed: rgba(220, 38, 38, 0.22);
 
 	/* Status colors — one per tab */
 	--tw-st-today: #EA580C;
@@ -68,10 +70,12 @@
 
 	--tw-danger: #F87171;
 	--tw-danger-soft: rgba(248, 113, 113, 0.12);
+	--tw-danger-armed: rgba(248, 113, 113, 0.28);
 	--tw-warning: #FBBF24;
 	--tw-warning-soft: rgba(251, 191, 36, 0.12);
 	--tw-success: #34D399;
 	--tw-success-soft: rgba(52, 211, 153, 0.12);
+	--tw-success-armed: rgba(52, 211, 153, 0.28);
 	--tw-info: #60A5FA;
 	--tw-info-soft: rgba(96, 165, 250, 0.12);
 
@@ -1921,10 +1925,10 @@ button.tw-icon-btn:focus-visible {
 	background: var(--tw-danger-soft) !important;
 }
 .v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-right > td {
-	background: rgba(5, 150, 105, 0.22) !important;
+	background: var(--tw-success-armed) !important;
 }
 .v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-left > td {
-	background: rgba(220, 38, 38, 0.18) !important;
+	background: var(--tw-danger-armed) !important;
 }
 
 /* Reveal an action icon on the leading edge of the swiped row. */

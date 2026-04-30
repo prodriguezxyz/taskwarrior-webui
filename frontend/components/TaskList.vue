@@ -697,14 +697,18 @@ export default defineComponent({
 			action();
 		};
 
+		const togglePending = (task: Task) => {
+			if (task.status === 'pending') completeTasks([task]);
+			else if (task.status === 'completed' || task.status === 'deleted') restoreTasks([task]);
+		};
+
 		const onCompleteClick = (event: MouseEvent, task: Task) => {
 			event.stopPropagation();
 			if (isMultiSelect(event)) {
 				toggleSelection(task);
 				return;
 			}
-			if (task.status === 'pending') completeTasks([task]);
-			else if (task.status === 'completed' || task.status === 'deleted') restoreTasks([task]);
+			togglePending(task);
 		};
 
 		const completeBtnIcon = (task: Task) => {
@@ -922,8 +926,7 @@ export default defineComponent({
 					if (onActivator) return;
 					if (!cur) return;
 					e.preventDefault();
-					if (cur.status === 'pending') completeTasks([cur]);
-					else if (cur.status === 'completed' || cur.status === 'deleted') restoreTasks([cur]);
+					togglePending(cur);
 			}
 		};
 
@@ -934,6 +937,10 @@ export default defineComponent({
 		const SWIPE_DIRECTION_LOCK = 8;
 		const SWIPE_TRANSLATE_CAP = 100;
 		const SWIPE_ACTION_THRESHOLD = 80;
+		const SWIPE_SNAP_MS = 180;
+		const SWIPE_CLEANUP_MS = SWIPE_SNAP_MS + 40;
+		const SWIPE_CLICK_SUPPRESS_MS = 150;
+
 		type SwipeState = {
 			tr: HTMLElement;
 			uuid: string;
@@ -941,9 +948,11 @@ export default defineComponent({
 			startX: number;
 			startY: number;
 			direction: 'h' | 'v' | null;
+			lastTransform: string;
+			lastSide: 'right' | 'left' | null;
+			lastArmed: boolean;
 		};
 		let swipeState: SwipeState | null = null;
-
 		let swipeCleanupTimer: number | null = null;
 
 		const swipeCleanup = (tr: HTMLElement) => {
@@ -952,18 +961,22 @@ export default defineComponent({
 			tr.classList.remove('tw-row--swipe-right', 'tw-row--swipe-left', 'tw-row--swipe-armed');
 		};
 
+		const detachSwipeListeners = () => {
+			window.removeEventListener('pointermove', onSwipeMove);
+			window.removeEventListener('pointerup', onSwipeEnd);
+			window.removeEventListener('pointercancel', onSwipeCancel);
+		};
+
 		const onSwipeStart = (e: PointerEvent) => {
 			if (!isMobile.value) return;
 			if (e.pointerType === 'mouse') return;
-			// One finger at a time — a second touch shouldn't hijack the gesture.
 			if (swipeState) return;
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
 			if (target.closest('button, a, .v-data-footer, thead')) return;
 			const tr = target.closest('tr') as HTMLElement | null;
 			if (!tr || tr.classList.contains('v-row-group__header')) return;
-			const uuidEl = tr.querySelector('[data-task-uuid]') as HTMLElement | null;
-			const uuid = uuidEl?.dataset.taskUuid;
+			const uuid = tr.querySelector<HTMLElement>('[data-task-uuid]')?.dataset.taskUuid;
 			if (!uuid) return;
 			// Cancel any in-flight snap-back animation so the new gesture doesn't
 			// inherit a transition and animate to the finger position.
@@ -972,52 +985,69 @@ export default defineComponent({
 				swipeCleanupTimer = null;
 			}
 			swipeCleanup(tr);
-			swipeState = { tr, uuid, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, direction: null };
+			swipeState = {
+				tr, uuid, pointerId: e.pointerId,
+				startX: e.clientX, startY: e.clientY, direction: null,
+				lastTransform: '', lastSide: null, lastArmed: false
+			};
+			window.addEventListener('pointermove', onSwipeMove);
+			window.addEventListener('pointerup', onSwipeEnd);
+			window.addEventListener('pointercancel', onSwipeCancel);
 		};
 
-		const onSwipeMove = (e: PointerEvent) => {
+		function onSwipeMove(e: PointerEvent) {
 			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const dx = e.clientX - swipeState.startX;
 			const dy = e.clientY - swipeState.startY;
 			if (swipeState.direction === null) {
-				if (Math.abs(dx) > SWIPE_DIRECTION_LOCK && Math.abs(dx) > Math.abs(dy)) {
-					swipeState.direction = 'h';
-				}
-				else if (Math.abs(dy) > SWIPE_DIRECTION_LOCK) {
+				if (Math.abs(dx) <= SWIPE_DIRECTION_LOCK && Math.abs(dy) <= SWIPE_DIRECTION_LOCK) return;
+				if (Math.abs(dy) > Math.abs(dx)) {
 					swipeState = null;
+					detachSwipeListeners();
 					return;
 				}
-				else {
-					return;
-				}
+				swipeState.direction = 'h';
 			}
-			const tr = swipeState.tr;
+			const s = swipeState;
 			const capped = Math.max(-SWIPE_TRANSLATE_CAP, Math.min(SWIPE_TRANSLATE_CAP, dx));
-			tr.style.transform = `translateX(${capped}px)`;
+			const transform = `translateX(${capped}px)`;
+			if (transform !== s.lastTransform) {
+				s.tr.style.transform = transform;
+				s.lastTransform = transform;
+			}
+			const side = dx > 0 ? 'right' : 'left';
+			if (side !== s.lastSide) {
+				s.tr.classList.toggle('tw-row--swipe-right', side === 'right');
+				s.tr.classList.toggle('tw-row--swipe-left', side === 'left');
+				s.lastSide = side;
+			}
 			const armed = Math.abs(dx) > SWIPE_ACTION_THRESHOLD;
-			tr.classList.toggle('tw-row--swipe-right', dx > 0);
-			tr.classList.toggle('tw-row--swipe-left', dx < 0);
-			tr.classList.toggle('tw-row--swipe-armed', armed);
-		};
+			if (armed !== s.lastArmed) {
+				s.tr.classList.toggle('tw-row--swipe-armed', armed);
+				s.lastArmed = armed;
+			}
+		}
 
-		const onSwipeEnd = (e: PointerEvent) => {
+		function onSwipeEnd(e: PointerEvent) {
 			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const s = swipeState;
 			swipeState = null;
+			detachSwipeListeners();
+
 			const dx = e.clientX - s.startX;
 			const horizontal = s.direction === 'h';
 			const armed = horizontal && Math.abs(dx) >= SWIPE_ACTION_THRESHOLD;
 
-			s.tr.style.transition = 'transform 180ms ease, background-color 180ms ease';
+			s.tr.style.transition = `transform ${SWIPE_SNAP_MS}ms ease`;
 			s.tr.style.transform = '';
 			if (swipeCleanupTimer !== null) window.clearTimeout(swipeCleanupTimer);
 			swipeCleanupTimer = window.setTimeout(() => {
 				swipeCleanup(s.tr);
 				swipeCleanupTimer = null;
-			}, 220);
+			}, SWIPE_CLEANUP_MS);
 
 			// Suppress the synthetic click that follows pointerup after a real
-			// horizontal swipe — otherwise the description's @click would open
+			// horizontal swipe — otherwise the description's @click would re-open
 			// the edit dialog after every successful swipe.
 			if (horizontal && Math.abs(dx) > SWIPE_DIRECTION_LOCK) {
 				const suppress = (ev: MouseEvent) => {
@@ -1027,43 +1057,32 @@ export default defineComponent({
 				window.addEventListener('click', suppress, { capture: true, once: true });
 				window.setTimeout(() => {
 					window.removeEventListener('click', suppress, true);
-				}, 150);
+				}, SWIPE_CLICK_SUPPRESS_MS);
 			}
 
 			if (!armed) return;
 			const item = currentItems.value.find(i => i.uuid === s.uuid);
 			if (!item) return;
-			if (dx > 0) {
-				if (item.status === 'pending') completeTasks([item]);
-				else if (item.status === 'completed' || item.status === 'deleted') restoreTasks([item]);
-			}
-			else {
-				onRowDelete(item);
-			}
-		};
+			if (dx > 0) togglePending(item);
+			else onRowDelete(item);
+		}
 
-		const onSwipeCancel = (e: PointerEvent) => {
+		function onSwipeCancel(e: PointerEvent) {
 			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
 			const tr = swipeState.tr;
 			swipeState = null;
+			detachSwipeListeners();
 			swipeCleanup(tr);
 			if (swipeCleanupTimer !== null) {
 				window.clearTimeout(swipeCleanupTimer);
 				swipeCleanupTimer = null;
 			}
-		};
+		}
 
-		onMounted(() => {
-			window.addEventListener('keydown', onGridKeydown);
-			window.addEventListener('pointermove', onSwipeMove);
-			window.addEventListener('pointerup', onSwipeEnd);
-			window.addEventListener('pointercancel', onSwipeCancel);
-		});
+		onMounted(() => window.addEventListener('keydown', onGridKeydown));
 		onBeforeUnmount(() => {
 			window.removeEventListener('keydown', onGridKeydown);
-			window.removeEventListener('pointermove', onSwipeMove);
-			window.removeEventListener('pointerup', onSwipeEnd);
-			window.removeEventListener('pointercancel', onSwipeCancel);
+			detachSwipeListeners();
 		});
 
 		const tabCount = (st: string): number => {
