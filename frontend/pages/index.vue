@@ -102,12 +102,14 @@ export default defineComponent({
 			return 'tw-page__icon--inbox';
 		});
 
+		const ownTasks = computed((): Task[] => store.getters.ownTasks);
+
 		const pendingCount = computed(() => {
-			const base = store.state.tasks.filter((t: Task) => t.status === 'pending');
 			if (view.value === 'today') {
 				const endOfToday = moment().endOf('day');
 				const now = moment();
-				return base.filter((t: Task) => {
+				return store.state.tasks.filter((t: Task) => {
+					if (t.status !== 'pending') return false;
 					const waiting = (t.wait && moment(t.wait).isAfter(now))
 						|| (t.scheduled && moment(t.scheduled).isAfter(now));
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
@@ -116,45 +118,51 @@ export default defineComponent({
 			if (view.value === 'mine') {
 				const me = store.state.user?.email;
 				if (!me) return 0;
-				return base.filter((t: Task) => (t as any).assignee === me).length;
+				return store.state.tasks.filter((t: Task) =>
+					t.status === 'pending' && (t as any).assignee === me).length;
 			}
 			if (view.value === 'tags') {
 				const set = new Set<string>();
-				for (const t of store.state.tasks) {
+				for (const t of ownTasks.value) {
 					if (t.tags) for (const tg of t.tags) set.add(tg);
 				}
 				return set.size;
 			}
 			if (view.value === 'projects') {
 				const set = new Set<string>();
-				for (const t of store.state.tasks) {
+				for (const t of ownTasks.value) {
 					if (t.project) set.add(t.project);
 				}
 				return set.size;
 			}
+			const ownPending = ownTasks.value.filter((t: Task) => t.status === 'pending');
 			if (tagFilter.value) {
-				return base.filter((t: Task) => t.tags?.includes(tagFilter.value!)).length;
+				return ownPending.filter((t: Task) => t.tags?.includes(tagFilter.value!)).length;
 			}
 			if (projectFilter.value) {
-				return base.filter((t: Task) => t.project === projectFilter.value).length;
+				return ownPending.filter((t: Task) => t.project === projectFilter.value).length;
 			}
-			return base.filter((t: Task) => !t.project && !(t as any).parent).length;
+			return ownPending.filter((t: Task) => !t.project && !(t as any).parent).length;
 		});
 
 		const progress = computed(() => {
+			let rel: Task[];
 			if (tagFilter.value) {
 				const tg = tagFilter.value;
-				const rel = store.state.tasks.filter((t: Task) => t.tags?.includes(tg));
-				const completed = rel.reduce((acc: number, t: Task) => t.status === 'completed' ? acc + 1 : acc, 0);
-				const pending = rel.reduce((acc: number, t: Task) => t.status === 'pending' ? acc + 1 : acc, 0);
-				const total = completed + pending;
-				return total === 0 ? 100 : Math.round(100 * completed / total);
+				rel = ownTasks.value.filter((t: Task) => t.tags?.includes(tg));
 			}
-			if (!projectFilter.value) return 0;
-			const proj = projectFilter.value;
-			const rel = store.state.tasks.filter((t: Task) => t.project === proj);
-			const completed = rel.reduce((acc: number, t: Task) => t.status === 'completed' ? acc + 1 : acc, 0);
-			const pending = rel.reduce((acc: number, t: Task) => t.status === 'pending' ? acc + 1 : acc, 0);
+			else if (projectFilter.value) {
+				const proj = projectFilter.value;
+				rel = ownTasks.value.filter((t: Task) => t.project === proj);
+			}
+			else {
+				return 0;
+			}
+			let completed = 0; let pending = 0;
+			for (const t of rel) {
+				if (t.status === 'completed') completed++;
+				else if (t.status === 'pending') pending++;
+			}
 			const total = completed + pending;
 			return total === 0 ? 100 : Math.round(100 * completed / total);
 		});

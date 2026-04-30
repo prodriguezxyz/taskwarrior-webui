@@ -32,7 +32,8 @@ app.use(async (ctx, next) => {
 app.use(authMiddleware);
 
 app.use(async (ctx, next) => {
-	if (ctx.path.startsWith('/profiles') || ctx.path.startsWith('/auth')) {
+	if (ctx.path.startsWith('/profiles') || ctx.path.startsWith('/auth')
+		|| ctx.path === '/tasks/aggregate') {
 		await next();
 		return;
 	}

@@ -2,6 +2,13 @@ import { ActionTree, MutationTree, GetterTree } from 'vuex';
 import { Task } from 'taskwarrior-lib';
 import { getAccessorType } from 'typed-vuex';
 
+export type TaskWithProfile = Task & { _profile?: string; _group?: string };
+export type ViewName = 'all' | 'today' | 'tags' | 'projects' | 'mine';
+export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'mine']);
+export function isCrossProfileView(view: ViewName): boolean {
+	return CROSS_PROFILE_VIEWS.has(view);
+}
+
 export const state = () => ({
 	tasks: [] as Task[],
 	snackbar: false,
@@ -25,7 +32,7 @@ export const state = () => ({
 	projectFilter: null as string | null,
 	tagFilter: null as string | null,
 	assigneeFilter: null as string | null,
-	view: 'all' as 'all' | 'today' | 'tags' | 'projects' | 'mine',
+	view: 'all' as ViewName,
 	searchOpen: false,
 	quickAddOpen: false,
 	taskDialog: {
@@ -59,6 +66,20 @@ export const getters: GetterTree<RootState, RootState> = {
 		if (m && m.name) return m.name;
 		const at = email.indexOf('@');
 		return at > 0 ? email.slice(0, at) : email;
+	},
+	multiProfile: state => state.profiles.length > 1,
+	// Single profile: every task is "ours". Multi-profile: must match the active profile.
+	// Used by profile-scoped views (Inbox, projects, tags); Today and Mine ignore this.
+	isOwnProfile: state => (task: Task): boolean => {
+		if (state.profiles.length <= 1) return true;
+		return (task as TaskWithProfile)._profile === state.settings.profile;
+	},
+	// Memoized profile-scoped subset. Cheaper than re-filtering in every
+	// computed that needs "tasks in the active profile".
+	ownTasks: (state): Task[] => {
+		if (state.profiles.length <= 1) return state.tasks;
+		const active = state.settings.profile;
+		return state.tasks.filter(t => (t as TaskWithProfile)._profile === active);
 	}
 };
 
@@ -110,7 +131,7 @@ export const mutations: MutationTree<RootState> = {
 		state.assigneeFilter = value;
 	},
 
-	setView(state, value: 'all' | 'today' | 'tags' | 'projects' | 'mine') {
+	setView(state, value: ViewName) {
 		state.view = value;
 	},
 
@@ -195,53 +216,143 @@ export const actions: ActionTree<RootState, RootState> = {
 			return;
 		}
 		try {
-			const payload: { members: Array<{ email: string, name: string }> }
-				= await this.$axios.$get(`/api/profiles/${encodeURIComponent(profile)}/members`);
-			context.commit('setMembers', payload.members);
+			context.commit('setMembers', await loadProfileMembers(this.$axios, profile));
 		}
 		catch (err) {
-			// Non-fatal: members list is auxiliary. Leave whatever was previously cached
-			// rather than blowing up the boot flow or profile switch.
+			// Non-fatal: keep whatever was cached rather than blowing up
+			// the boot flow or wiping the list on a transient blip.
 			console.error('[store] fetchMembers failed:', err);
 		}
 	},
 
+	// Read-only fetch for arbitrary profile members. Does NOT mutate
+	// state.members so the active profile's list (used by the rest of
+	// the UI) stays put while a dialog edits a cross-profile task.
+	async fetchMembersFor(_context, profile: string) {
+		if (!profile) return [];
+		try {
+			return await loadProfileMembers(this.$axios, profile);
+		}
+		catch (err) {
+			console.error('[store] fetchMembersFor failed:', err);
+			return [];
+		}
+	},
+
 	async fetchTasks(context) {
-		const tasks: Task[] = await this.$axios.$get('/api/tasks');
+		const multi = context.state.profiles.length > 1;
+		const url = multi ? '/api/tasks/aggregate' : '/api/tasks';
+		const tasks: Task[] = await this.$axios.$get(url);
 		// Recurring child instances may be exported without `project`/`tags`
 		// even when their parent template defines them. Inherit from parent
 		// so Inbox/project filters and counts treat them consistently.
-		const byUuid = new Map<string, Task>();
-		for (const t of tasks) if (t.uuid) byUuid.set(t.uuid, t);
+		// In aggregated mode, do this scoped per profile so a child never
+		// inherits from a parent UUID that lives in a different profile.
+		const buckets = new Map<string, Task[]>();
 		for (const t of tasks) {
-			if (!t.parent) continue;
-			const parent = byUuid.get(t.parent);
-			if (!parent) continue;
-			if (!t.project && parent.project) t.project = parent.project;
-			if ((!t.tags || !t.tags.length) && parent.tags?.length) t.tags = [...parent.tags];
+			const key = (t as TaskWithProfile)._profile || '';
+			const arr = buckets.get(key) || [];
+			arr.push(t); buckets.set(key, arr);
+		}
+		for (const arr of buckets.values()) {
+			const byUuid = new Map<string, Task>();
+			for (const t of arr) if (t.uuid) byUuid.set(t.uuid, t);
+			for (const t of arr) {
+				if (!t.parent) continue;
+				const parent = byUuid.get(t.parent);
+				if (!parent) continue;
+				if (!t.project && parent.project) t.project = parent.project;
+				if ((!t.tags || !t.tags.length) && parent.tags?.length) t.tags = [...parent.tags];
+			}
 		}
 		context.commit('setTasks', tasks);
 	},
 
 	async deleteTasks(context, tasks: Task[]) {
-		await this.$axios.$delete('/api/tasks', {
-			params: { tasks: tasks.map(task => task.uuid) }
-		});
-		// Refresh
+		const groups = groupByProfile(tasks);
+		for (const [profile, ts] of groups) {
+			const headers = profile ? { 'X-Profile': profile } : undefined;
+			await this.$axios.$delete('/api/tasks', {
+				params: { tasks: ts.map(task => task.uuid) },
+				headers
+			});
+		}
 		await context.dispatch('fetchTasks');
 	},
 
 	async updateTasks(context, tasks: Task[]) {
-		await this.$axios.$put('/api/tasks', { tasks });
-		// Refresh
+		const groups = groupByProfile(tasks);
+		for (const [profile, ts] of groups) {
+			const headers = profile ? { 'X-Profile': profile } : undefined;
+			// Strip frontend-only annotations before sending — taskwarrior-lib
+			// persists unknown fields, so leaving _profile on the payload
+			// would create a stray UDA on every updated task.
+			const payload = ts.map(t => stripInternalFields(t));
+			await this.$axios.$put('/api/tasks', { tasks: payload }, { headers });
+		}
 		await context.dispatch('fetchTasks');
 	},
 
 	async syncTasks(context) {
-		await this.$axios.$post('/api/sync');
+		const profiles = context.state.profiles;
+		if (profiles.length <= 1) {
+			await this.$axios.$post('/api/sync');
+			await context.dispatch('fetchTasks');
+			return;
+		}
+		// Sync every profile the user has access to. Run in parallel and
+		// gather results so a single broken taskserver doesn't prevent the
+		// other profiles from syncing.
+		const results = await Promise.allSettled(
+			profiles.map(p =>
+				this.$axios.$post('/api/sync', null, {
+					headers: { 'X-Profile': p.name }
+				})
+			)
+		);
+		const failed = profiles
+			.filter((_, i) => results[i].status === 'rejected')
+			.map(p => p.name);
+		// Always refresh — partial-failure case still has fresh data from
+		// the profiles that did sync, and surfacing it beats hiding it
+		// behind a generic error notification.
 		await context.dispatch('fetchTasks');
+		if (failed.length > 0) {
+			const err: any = new Error(`Sync failed for: ${failed.join(', ')}`);
+			err.failedProfiles = failed;
+			err.succeededCount = profiles.length - failed.length;
+			throw err;
+		}
 	}
 };
+
+function groupByProfile(tasks: Task[]): Map<string | null, Task[]> {
+	const groups = new Map<string | null, Task[]>();
+	for (const t of tasks) {
+		const key = (t as TaskWithProfile)._profile ?? null;
+		const arr = groups.get(key) || [];
+		arr.push(t); groups.set(key, arr);
+	}
+	return groups;
+}
+
+const INTERNAL_FIELDS = ['_profile', '_group'];
+function stripInternalFields(task: Task): Task {
+	const out: any = {};
+	for (const k of Object.keys(task)) {
+		if (!INTERNAL_FIELDS.includes(k)) out[k] = (task as any)[k];
+	}
+	return out as Task;
+}
+
+async function loadProfileMembers(
+	axios: any,
+	profile: string
+): Promise<Array<{ email: string, name: string }>> {
+	const payload: { members: Array<{ email: string, name: string }> }
+		= await axios.$get(`/api/profiles/${encodeURIComponent(profile)}/members`);
+	return payload.members;
+}
 
 export const accessorType = getAccessorType({
 	state,

@@ -238,7 +238,10 @@ export default defineComponent({
 			set: val => {
 				store.dispatch('updateSettings', { ...store.state.settings, profile: val });
 				store.dispatch('fetchMembers');
-				store.dispatch('fetchTasks');
+				// Multi-profile: tasks are loaded via /api/tasks/aggregate which
+				// already covers every profile, so flipping the active profile
+				// doesn't require a refetch — only the per-profile member list does.
+				if (!store.getters.multiProfile) store.dispatch('fetchTasks');
 			}
 		});
 
@@ -250,13 +253,20 @@ export default defineComponent({
 			store.state.tasks.filter((t: any) => t.status === 'pending')
 		);
 
+		// Profile-scoped subsets for views that show "this profile only" data
+		// (Inbox, project list, tags). Today/Mine deliberately ignore this.
+		const ownTasks = computed((): any[] => store.getters.ownTasks);
+		const ownPendingTasks = computed(() =>
+			ownTasks.value.filter((t: any) => t.status === 'pending')
+		);
+
 		const totalPending = computed(() =>
-			pendingTasks.value.filter((t: any) => !t.project && !t.parent).length
+			ownPendingTasks.value.filter((t: any) => !t.project && !t.parent).length
 		);
 
 		const totalTags = computed(() => {
 			const set = new Set<string>();
-			for (const t of store.state.tasks) {
+			for (const t of ownTasks.value) {
 				if (t.tags) for (const tg of t.tags) set.add(tg);
 			}
 			return set.size;
@@ -282,13 +292,13 @@ export default defineComponent({
 
 		const projectList = computed(() => {
 			const counts = new Map<string, number>();
-			for (const t of pendingTasks.value) {
+			for (const t of ownPendingTasks.value) {
 				if (t.project) counts.set(t.project, (counts.get(t.project) || 0) + 1);
 			}
 			// Include projects that have no pending tasks too (from any task),
 			// but skip projects whose only remaining tasks are deleted — otherwise
 			// a "deleted" project keeps showing in the sidebar with count 0.
-			for (const t of store.state.tasks) {
+			for (const t of ownTasks.value) {
 				if (t.status === 'deleted') continue;
 				if (t.project && !counts.has(t.project)) counts.set(t.project, 0);
 			}

@@ -92,7 +92,7 @@ export default defineComponent({
 		const inputRef = ref<any>(null);
 
 		const affectedTasks = computed((): Task[] =>
-			store.state.tasks.filter(t => t.tags?.includes(props.tag))
+			(store.getters.ownTasks as Task[]).filter(t => t.tags?.includes(props.tag))
 		);
 		const affectedCount = computed(() => affectedTasks.value.length);
 

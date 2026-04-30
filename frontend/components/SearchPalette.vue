@@ -60,6 +60,9 @@
 						{{ statusIcon(task) }}
 					</v-icon>
 					<span class="tw-palette__item-desc" v-html="highlight(task.description || '')" />
+					<span v-if="multiProfile && task._profile" class="tw-palette__item-profile">
+						{{ task._profile }}
+					</span>
 					<span v-if="task.project" class="tw-palette__item-meta">
 						<v-icon size="11" class="tw-palette__item-meta-icon">mdi-folder-outline</v-icon>
 						{{ task.project }}
@@ -227,6 +230,8 @@ export default defineComponent({
 			return safe.replace(re, m => `<mark class="tw-palette__mark">${m}</mark>`);
 		};
 
+		const multiProfile = computed(() => store.getters.multiProfile);
+
 		return {
 			open,
 			query,
@@ -240,7 +245,8 @@ export default defineComponent({
 			displayDate,
 			statusKey,
 			statusIcon,
-			highlight
+			highlight,
+			multiProfile
 		};
 	}
 });

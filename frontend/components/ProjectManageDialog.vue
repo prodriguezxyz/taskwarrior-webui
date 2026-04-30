@@ -94,7 +94,7 @@ export default defineComponent({
 		const inputRef = ref<any>(null);
 
 		const affectedTasks = computed((): Task[] =>
-			store.state.tasks.filter(t => t.project === props.project)
+			(store.getters.ownTasks as Task[]).filter(t => t.project === props.project)
 		);
 		const affectedCount = computed(() => affectedTasks.value.length);
 		// For deletion, skip tasks already marked deleted — re-deleting them is a

@@ -147,7 +147,7 @@
 <script lang="ts">
 import { defineComponent, useStore, watch, computed, ref } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
-import { accessorType } from '../store';
+import { accessorType, TaskWithProfile } from '../store';
 
 export default defineComponent({
 	props: {
@@ -160,10 +160,57 @@ export default defineComponent({
 	setup(props, ctx) {
 		const store = useStore<typeof accessorType>();
 
-		const projects = computed(() => store.getters.projects);
-		const tags = computed(() => store.getters.tags);
+		// Profile this dialog operates on. For new tasks and same-profile edits
+		// it matches the active profile; for cross-profile edits it follows
+		// the task's _profile so suggestions / assignees stay correct.
+		const contextProfile = computed(() =>
+			(props.task as TaskWithProfile | undefined)?._profile ?? store.state.settings.profile
+		);
+		const isCrossProfile = computed(() =>
+			store.getters.multiProfile
+			&& contextProfile.value !== store.state.settings.profile
+		);
+
+		const inContext = (t: Task) =>
+			!store.getters.multiProfile
+			|| (t as TaskWithProfile)._profile === contextProfile.value;
+
+		const projects = computed(() => {
+			const set = new Set<string>();
+			for (const t of store.state.tasks) {
+				if (!inContext(t)) continue;
+				if (t.project) set.add(t.project);
+			}
+			return Array.from(set).sort();
+		});
+
+		const tags = computed(() => {
+			const set = new Set<string>();
+			for (const t of store.state.tasks) {
+				if (!inContext(t)) continue;
+				if (t.tags) for (const tg of t.tags) set.add(tg);
+			}
+			return Array.from(set).sort();
+		});
+
+		// Cross-profile: fetched once per dialog open; same-profile: live
+		// view of state.members via computed below.
+		const fetchedMembers = ref<Array<{ email: string, name: string }>>([]);
+		watch([() => props.value, contextProfile], ([open]) => {
+			if (open && isCrossProfile.value) {
+				store.dispatch('fetchMembersFor', contextProfile.value)
+					.then(m => {
+						fetchedMembers.value = m;
+					});
+			}
+		}, { immediate: true });
+
+		const dialogMembers = computed(() =>
+			isCrossProfile.value ? fetchedMembers.value : store.state.members
+		);
+
 		const memberItems = computed(() =>
-			store.state.members.map(m => ({
+			dialogMembers.value.map(m => ({
 				email: m.email,
 				label: m.name || m.email.split('@')[0]
 			}))

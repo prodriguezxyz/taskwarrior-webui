@@ -219,6 +219,11 @@
 						@click="onDescriptionClick($event, item)"
 					>
 						<span v-html="linkify(item.description)" />
+						<span
+							v-if="showProfileChip && item._profile"
+							class="tw-profile-chip"
+							:title="`Profile: ${item._profile}`"
+						>{{ item._profile }}</span>
 					</span>
 				</template>
 
@@ -301,7 +306,7 @@ import ColumnDialog from '../components/ColumnDialog.vue';
 import moment from 'moment';
 import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
-import { accessorType } from '../store';
+import { accessorType, isCrossProfileView } from '../store';
 
 function displayDate(str?: string) {
 	if (!str)
@@ -397,6 +402,10 @@ export default defineComponent({
 			return props.tasks?.some(t => Boolean((t as any).assignee)) ?? false;
 		});
 
+		const showProfileChip = computed(() =>
+			store.getters.multiProfile && isCrossProfileView(view.value)
+		);
+
 		const headers = computed(() => [
 			{ text: '', value: '_complete', sortable: false, width: '36px', class: 'tw-th--compact', cellClass: 'tw-td--compact' },
 			{ text: 'Description', value: 'description' },
@@ -437,15 +446,25 @@ export default defineComponent({
 
 		const assigneeLabel = (email?: string) => store.getters.assigneeLabel(email);
 
+		// Filter chips list only the tags/assignees visible in the current
+		// scope; otherwise multi-profile users see chips that can't match
+		// any rendered row.
+		const inScope = (t: Task) =>
+			isCrossProfileView(view.value) || store.getters.isOwnProfile(t);
+
 		const availableTags = computed(() => {
 			const set = new Set<string>();
-			props.tasks?.forEach(t => t.tags?.forEach(tg => set.add(tg)));
+			props.tasks?.forEach(t => {
+				if (!inScope(t)) return;
+				t.tags?.forEach(tg => set.add(tg));
+			});
 			return Array.from(set).sort();
 		});
 
 		const availableAssignees = computed(() => {
 			const set = new Set<string>();
 			props.tasks?.forEach(t => {
+				if (!inScope(t)) return;
 				const a = (t as any).assignee;
 				if (a) set.add(a);
 			});
@@ -492,6 +511,7 @@ export default defineComponent({
 		};
 
 		const matchesFilters = (task: Task) => {
+			if (!isCrossProfileView(view.value) && !store.getters.isOwnProfile(task)) return false;
 			if (projectFilter.value && task.project !== projectFilter.value) return false;
 			if (sidebarTagFilter.value && !task.tags?.includes(sidebarTagFilter.value)) return false;
 			if (priorityFilter.value && task.priority !== priorityFilter.value) return false;
@@ -591,11 +611,15 @@ export default defineComponent({
 					text: 'Successfully synced tasks.'
 				});
 			}
-			catch (error) {
-				store.commit('setNotification', {
-					color: 'error',
-					text: 'Failed to sync tasks.'
-				});
+			catch (error: any) {
+				// Multi-profile partial failure: surface which profiles failed
+				// so the user knows what (if anything) needs retry.
+				const failed: string[] | undefined = error?.failedProfiles;
+				const succeeded: number | undefined = error?.succeededCount;
+				const text = (failed && failed.length)
+					? `Sync failed for: ${failed.join(', ')}` + (succeeded ? ` (${succeeded} ok)` : '')
+					: 'Failed to sync tasks.';
+				store.commit('setNotification', { color: 'error', text });
 			}
 		};
 
@@ -918,6 +942,7 @@ export default defineComponent({
 			toggleAssignee,
 			togglePriority,
 			clearFilters,
+			showProfileChip,
 
 			ConfirmationDialog,
 			ColumnDialog
@@ -929,5 +954,19 @@ export default defineComponent({
 <style>
 .tw-table tr.tw-row--cursor > td:first-child {
 	box-shadow: inset 2px 0 0 0 currentColor;
+}
+
+.tw-profile-chip {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	border: 1px solid rgba(127, 127, 127, 0.35);
+	font-size: 11px;
+	line-height: 1.4;
+	color: rgba(127, 127, 127, 0.95);
+	background: transparent;
+	vertical-align: middle;
+	white-space: nowrap;
 }
 </style>

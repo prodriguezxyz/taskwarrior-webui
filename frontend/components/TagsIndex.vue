@@ -62,7 +62,7 @@ export default defineComponent({
 		const tagList = computed(() => {
 			const pending = new Map<string, number>();
 			const total = new Map<string, number>();
-			for (const t of store.state.tasks as Task[]) {
+			for (const t of store.getters.ownTasks as Task[]) {
 				if (!t.tags) continue;
 				const isPending = t.status === 'pending';
 				for (const tg of t.tags) {
