@@ -78,15 +78,14 @@
 		</v-app-bar>
 
 		<v-navigation-drawer
+			v-model="mobileDrawer"
 			app
 			:permanent="!isMobile"
 			:temporary="isMobile"
-			:value="isMobile ? mobileDrawer : true"
-			:width="isMobile ? mobileDrawerWidth : sidebarWidth"
+			:width="isMobile ? MOBILE_DRAWER_WIDTH : sidebarWidth"
 			class="tw-sidebar"
 			:class="{ 'tw-sidebar--resizing': resizing, 'tw-sidebar--mobile': isMobile }"
 			:mini-variant="false"
-			@input="onDrawerInput"
 		>
 			<div v-if="profiles.length > 1" class="tw-sidebar__header">
 				<v-select
@@ -325,58 +324,22 @@ export default defineComponent({
 
 		const isMobile = computed(() => context.$vuetify.breakpoint.smAndDown);
 		const mobileDrawer = ref(false);
-		const mobileDrawerWidth = computed(() => {
-			if (typeof window === 'undefined') return 280;
-			return Math.min(300, Math.max(240, window.innerWidth - 56));
-		});
-		const onDrawerInput = (val: boolean) => {
-			if (isMobile.value) mobileDrawer.value = val;
-		};
-		const closeMobileDrawer = () => {
-			if (isMobile.value) mobileDrawer.value = false;
+		const MOBILE_DRAWER_WIDTH = 280;
+		provide('isMobile', isMobile);
+
+		const selectView = (view: string, project: string | null = null) => {
+			store.commit('setProjectFilter', project);
+			store.commit('setTagFilter', null);
+			store.commit('setView', view);
+			mobileDrawer.value = false;
 		};
 
-		const setProject = (name: string | null) => {
-			store.commit('setProjectFilter', name);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'all');
-			closeMobileDrawer();
-		};
-
-		const selectInbox = () => {
-			store.commit('setProjectFilter', null);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'all');
-			closeMobileDrawer();
-		};
-
-		const selectToday = () => {
-			store.commit('setProjectFilter', null);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'today');
-			closeMobileDrawer();
-		};
-
-		const selectMine = () => {
-			store.commit('setProjectFilter', null);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'mine');
-			closeMobileDrawer();
-		};
-
-		const selectTagsIndex = () => {
-			store.commit('setProjectFilter', null);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'tags');
-			closeMobileDrawer();
-		};
-
-		const selectProjectsIndex = () => {
-			store.commit('setProjectFilter', null);
-			store.commit('setTagFilter', null);
-			store.commit('setView', 'projects');
-			closeMobileDrawer();
-		};
+		const setProject = (name: string | null) => selectView('all', name);
+		const selectInbox = () => selectView('all');
+		const selectToday = () => selectView('today');
+		const selectMine = () => selectView('mine');
+		const selectTagsIndex = () => selectView('tags');
+		const selectProjectsIndex = () => selectView('projects');
 
 		const taskDialogOpen = computed(() => store.state.taskDialog.open);
 		const taskDialogTask = computed(() => store.state.taskDialog.task);
@@ -387,11 +350,11 @@ export default defineComponent({
 
 		const openNewTask = () => {
 			store.commit('setQuickAddOpen', true);
-			closeMobileDrawer();
+			mobileDrawer.value = false;
 		};
 		const openSearch = () => {
 			store.commit('setSearchOpen', true);
-			closeMobileDrawer();
+			mobileDrawer.value = false;
 		};
 		const openQuickAdd = () => store.commit('setQuickAddOpen', true);
 
@@ -617,8 +580,7 @@ export default defineComponent({
 
 			isMobile,
 			mobileDrawer,
-			mobileDrawerWidth,
-			onDrawerInput,
+			MOBILE_DRAWER_WIDTH,
 
 			SettingsDialog,
 			TaskDialog,

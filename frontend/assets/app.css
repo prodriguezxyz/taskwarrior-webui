@@ -193,7 +193,6 @@ body { font-family: var(--tw-font); }
 
 .tw-icon-btn + .tw-icon-btn { margin-left: 2px; }
 
-/* Native button reset (used now that the app-bar icon-btns are <button>s) */
 button.tw-icon-btn {
 	appearance: none;
 	border: none;
@@ -1908,10 +1907,7 @@ button.tw-icon-btn:focus-visible {
 	}
 }
 
-/* ============================================================
-   RESPONSIVE — tablet & mobile
-   Vuetify's smAndDown breakpoint is <960px; we mirror it here.
-   ============================================================ */
+/* Responsive — Vuetify's smAndDown breakpoint is <960px; we mirror it here. */
 
 /* Column visibility helpers — applied via header.class / cellClass in TaskList */
 @media (max-width: 960px) {
@@ -2136,35 +2132,12 @@ button.tw-icon-btn:focus-visible {
 	}
 }
 
-/* Description sub-row — hidden by default; shown on phones to collapse
-   project / due / priority / tags into one line under the description. */
-.tw-description-cell { display: block; }
-
-.tw-description__sub { display: none; }
-
-/* Phones — hide low-priority columns so the table doesn't horizontally explode.
-   Description, project, due date, and the action icons are the must-haves. */
 @media (max-width: 600px) {
 	.tw-page {
 		padding-top: 12px;
 	}
 
 	.tw-page__title { font-size: 17px; }
-
-	/* Hide: priority, scheduled, until, tags, urgency, assignee.
-	   These map to data-table columns by header text via Vuetify's <thead>;
-	   we target by the cell's data-label / nth-child instead, which Vuetify
-	   doesn't expose, so we rely on aria-label on each <th> generated from
-	   the column 'text'. Vuetify outputs no such aria, so we resort to
-	   nth-child — keeping the visual columns intact while shrinking the rest.
-
-	   The render order from TaskList.vue headers is:
-	   1: complete  2: description  3: project  (4: assignee?)
-	   then: priority, scheduled, [recur?,] due/wait, until, tags, urgency, actions
-
-	   Rather than juggle nth-child counts (which break the moment a header
-	   toggles), we just enable horizontal scroll and let the user swipe.
-	   This avoids brittle CSS that breaks every time a column is toggled. */
 
 	.tw-table-wrap {
 		padding-left: 0;
@@ -2241,8 +2214,8 @@ button.tw-icon-btn:focus-visible {
 		color: var(--tw-text-muted);
 	}
 
-	/* Description text wraps onto multiple lines — no truncation */
-	.tw-description-cell .tw-description {
+	/* Description wraps onto multiple lines on phones — no truncation */
+	.tw-description {
 		display: block;
 		white-space: normal;
 		line-height: 1.45;

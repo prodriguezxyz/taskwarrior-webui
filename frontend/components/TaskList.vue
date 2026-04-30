@@ -219,43 +219,41 @@
 				</template>
 
 				<template v-slot:item.description="{ item }">
-					<div class="tw-description-cell">
+					<span
+						class="tw-description tw-description--clickable"
+						title="Edit task"
+						@click="onDescriptionClick($event, item)"
+					>
+						<span v-html="linkify(item.description)" />
 						<span
-							class="tw-description tw-description--clickable"
-							title="Edit task"
-							@click="onDescriptionClick($event, item)"
-						>
-							<span v-html="linkify(item.description)" />
-							<span
-								v-if="showProfileChip && item._profile"
-								class="tw-profile-chip"
-								:title="`Profile: ${item._profile}`"
-							>{{ item._profile }}</span>
+							v-if="showProfileChip && item._profile"
+							class="tw-profile-chip"
+							:title="`Profile: ${item._profile}`"
+						>{{ item._profile }}</span>
+					</span>
+					<div v-if="isMobile" class="tw-description__sub">
+						<span v-if="item.project" class="tw-description__sub-meta">
+							<v-icon size="11" aria-hidden="true">mdi-folder-outline</v-icon>
+							{{ item.project }}
 						</span>
-						<div class="tw-description__sub">
-							<span v-if="item.project" class="tw-description__sub-meta">
-								<v-icon size="11" aria-hidden="true">mdi-folder-outline</v-icon>
-								{{ item.project }}
-							</span>
-							<span
-								v-if="item.due"
-								class="tw-description__sub-meta"
-								:class="dueMetaClass(item)"
-							>
-								<v-icon size="11" aria-hidden="true">mdi-calendar-outline</v-icon>
-								{{ displayDate(item.due) }}
-							</span>
-							<span
-								v-if="item.priority"
-								class="tw-description__sub-prio"
-								:class="'tw-description__sub-prio--' + item.priority"
-							>P{{ item.priority }}</span>
-							<span
-								v-for="tag in item.tags"
-								:key="tag"
-								class="tw-description__sub-tag"
-							>#{{ tag }}</span>
-						</div>
+						<span
+							v-if="item.due"
+							class="tw-description__sub-meta"
+							:class="dueMetaClass(item)"
+						>
+							<v-icon size="11" aria-hidden="true">mdi-calendar-outline</v-icon>
+							{{ displayDate(item.due) }}
+						</span>
+						<span
+							v-if="item.priority"
+							class="tw-description__sub-prio"
+							:class="'tw-description__sub-prio--' + item.priority"
+						>P{{ item.priority }}</span>
+						<span
+							v-for="tag in item.tags"
+							:key="tag"
+							class="tw-description__sub-tag"
+						>#{{ tag }}</span>
 					</div>
 				</template>
 
@@ -441,24 +439,28 @@ export default defineComponent({
 			store.getters.multiProfile && isCrossProfileView(view.value)
 		);
 
+		const hide = (bp: 'sm' | 'xs') => ({
+			class: `tw-col--hide-${bp}`,
+			cellClass: `tw-col--hide-${bp}`
+		});
 		const headers = computed(() => [
 			{ text: '', value: '_complete', sortable: false, width: '36px', class: 'tw-th--compact', cellClass: 'tw-td--compact' },
 			{ text: 'Description', value: 'description' },
-			{ text: 'Project', value: 'project', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
+			{ text: 'Project', value: 'project', ...hide('xs') },
 			...(showAssigneeColumn.value
-				? [{ text: 'Assigned to', value: 'assignee', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' }]
+				? [{ text: 'Assigned to', value: 'assignee', ...hide('sm') }]
 				: []),
-			{ text: 'Priority', value: 'priority', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
-			{ text: 'Scheduled', value: 'scheduled', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
+			{ text: 'Priority', value: 'priority', ...hide('xs') },
+			{ text: 'Scheduled', value: 'scheduled', ...hide('sm') },
 			...(status.value === 'recurring'
-				? [{ text: 'Recur', value: 'recur', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' }]
+				? [{ text: 'Recur', value: 'recur', ...hide('sm') }]
 				: []),
 			...(status.value !== 'waiting'
-				? [{ text: 'Due', value: 'due', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' }]
-				: [{ text: 'Wait', value: 'wait', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' }]),
-			{ text: 'Until', value: 'until', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
-			{ text: 'Tags', value: 'tags', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
-			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
+				? [{ text: 'Due', value: 'due', ...hide('xs') }]
+				: [{ text: 'Wait', value: 'wait', ...hide('xs') }]),
+			{ text: 'Until', value: 'until', ...hide('sm') },
+			{ text: 'Tags', value: 'tags', ...hide('xs') },
+			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, ...hide('sm') },
 			{ text: 'Actions', value: 'actions', sortable: false }
 		]);
 
@@ -867,6 +869,7 @@ export default defineComponent({
 		};
 
 		const layoutDialogsOpen = inject<Ref<boolean>>('layoutDialogsOpen', ref(false));
+		const isMobile = inject<Ref<boolean>>('isMobile', ref(false));
 
 		const isGridBlocked = () =>
 			showConfirmationDialog.value
@@ -987,6 +990,7 @@ export default defineComponent({
 			togglePriority,
 			clearFilters,
 			showProfileChip,
+			isMobile,
 
 			ConfirmationDialog,
 			ColumnDialog
