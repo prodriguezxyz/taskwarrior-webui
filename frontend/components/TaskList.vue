@@ -409,21 +409,21 @@ export default defineComponent({
 		const headers = computed(() => [
 			{ text: '', value: '_complete', sortable: false, width: '36px', class: 'tw-th--compact', cellClass: 'tw-td--compact' },
 			{ text: 'Description', value: 'description' },
-			{ text: 'Project', value: 'project' },
+			{ text: 'Project', value: 'project', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
 			...(showAssigneeColumn.value
-				? [{ text: 'Assigned to', value: 'assignee' }]
+				? [{ text: 'Assigned to', value: 'assignee', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' }]
 				: []),
-			{ text: 'Priority', value: 'priority' },
-			{ text: 'Scheduled', value: 'scheduled' },
+			{ text: 'Priority', value: 'priority', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
+			{ text: 'Scheduled', value: 'scheduled', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
 			...(status.value === 'recurring'
-				? [{ text: 'Recur', value: 'recur' }]
+				? [{ text: 'Recur', value: 'recur', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' }]
 				: []),
 			...(status.value !== 'waiting'
 				? [{ text: 'Due', value: 'due' }]
 				: [{ text: 'Wait', value: 'wait' }]),
-			{ text: 'Until', value: 'until' },
-			{ text: 'Tags', value: 'tags' },
-			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a },
+			{ text: 'Until', value: 'until', class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
+			{ text: 'Tags', value: 'tags', class: 'tw-col--hide-xs', cellClass: 'tw-col--hide-xs' },
+			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, class: 'tw-col--hide-sm', cellClass: 'tw-col--hide-sm' },
 			{ text: 'Actions', value: 'actions', sortable: false }
 		]);
 

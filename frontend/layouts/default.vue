@@ -36,6 +36,19 @@
 		</v-snackbar>
 
 		<v-app-bar height="52px" fixed app flat>
+			<div
+				v-if="isMobile"
+				class="tw-icon-btn tw-icon-btn--menu"
+				role="button"
+				tabindex="0"
+				title="Menu"
+				aria-label="Toggle navigation"
+				@click="mobileDrawer = !mobileDrawer"
+				@keydown.enter="mobileDrawer = !mobileDrawer"
+			>
+				<v-icon size="20">mdi-menu</v-icon>
+			</div>
+
 			<div class="tw-wordmark">
 				<span class="tw-wordmark__dot" />
 				<span>Taskwarrior</span>
@@ -68,11 +81,14 @@
 
 		<v-navigation-drawer
 			app
-			permanent
-			:width="sidebarWidth"
+			:permanent="!isMobile"
+			:temporary="isMobile"
+			:value="isMobile ? mobileDrawer : true"
+			:width="isMobile ? mobileDrawerWidth : sidebarWidth"
 			class="tw-sidebar"
-			:class="{ 'tw-sidebar--resizing': resizing }"
+			:class="{ 'tw-sidebar--resizing': resizing, 'tw-sidebar--mobile': isMobile }"
 			:mini-variant="false"
+			@input="onDrawerInput"
 		>
 			<div v-if="profiles.length > 1" class="tw-sidebar__header">
 				<v-select
@@ -198,6 +214,7 @@
 			</nav>
 
 			<div
+				v-if="!isMobile"
 				class="tw-sidebar__resize"
 				title="Drag to resize · double-click to reset"
 				role="separator"
@@ -307,40 +324,59 @@ export default defineComponent({
 				.sort((a, b) => a.name.localeCompare(b.name));
 		});
 
+		const isMobile = computed(() => context.$vuetify.breakpoint.smAndDown);
+		const mobileDrawer = ref(false);
+		const mobileDrawerWidth = computed(() => {
+			if (typeof window === 'undefined') return 280;
+			return Math.min(300, Math.max(240, window.innerWidth - 56));
+		});
+		const onDrawerInput = (val: boolean) => {
+			if (isMobile.value) mobileDrawer.value = val;
+		};
+		const closeMobileDrawer = () => {
+			if (isMobile.value) mobileDrawer.value = false;
+		};
+
 		const setProject = (name: string | null) => {
 			store.commit('setProjectFilter', name);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'all');
+			closeMobileDrawer();
 		};
 
 		const selectInbox = () => {
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'all');
+			closeMobileDrawer();
 		};
 
 		const selectToday = () => {
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'today');
+			closeMobileDrawer();
 		};
 
 		const selectMine = () => {
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'mine');
+			closeMobileDrawer();
 		};
 
 		const selectTagsIndex = () => {
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'tags');
+			closeMobileDrawer();
 		};
 
 		const selectProjectsIndex = () => {
 			store.commit('setProjectFilter', null);
 			store.commit('setTagFilter', null);
 			store.commit('setView', 'projects');
+			closeMobileDrawer();
 		};
 
 		const taskDialogOpen = computed(() => store.state.taskDialog.open);
@@ -350,8 +386,14 @@ export default defineComponent({
 			if (!val) store.commit('closeTaskDialog');
 		};
 
-		const openNewTask = () => store.commit('setQuickAddOpen', true);
-		const openSearch = () => store.commit('setSearchOpen', true);
+		const openNewTask = () => {
+			store.commit('setQuickAddOpen', true);
+			closeMobileDrawer();
+		};
+		const openSearch = () => {
+			store.commit('setSearchOpen', true);
+			closeMobileDrawer();
+		};
 		const openQuickAdd = () => store.commit('setQuickAddOpen', true);
 
 		const projectDialogOpen = ref(false);
@@ -565,6 +607,11 @@ export default defineComponent({
 			resizing,
 			startResize,
 			resetSidebarWidth,
+
+			isMobile,
+			mobileDrawer,
+			mobileDrawerWidth,
+			onDrawerInput,
 
 			SettingsDialog,
 			TaskDialog,

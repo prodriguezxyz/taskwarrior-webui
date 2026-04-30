@@ -1835,3 +1835,190 @@ body { font-family: var(--tw-font); }
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* ============================================================
+   RESPONSIVE — tablet & mobile
+   Vuetify's smAndDown breakpoint is <960px; we mirror it here.
+   ============================================================ */
+
+/* Column visibility helpers — applied via header.class / cellClass in TaskList */
+@media (max-width: 960px) {
+	.v-application .tw-table th.tw-col--hide-sm,
+	.v-application .tw-table td.tw-col--hide-sm { display: none !important; }
+}
+
+@media (max-width: 600px) {
+	.v-application .tw-table th.tw-col--hide-xs,
+	.v-application .tw-table td.tw-col--hide-xs { display: none !important; }
+}
+
+@media (max-width: 960px) {
+	/* App bar — tighter padding so the menu button + wordmark fit */
+	.v-application .v-app-bar .v-toolbar__content {
+		padding: 0 12px;
+	}
+
+	.tw-icon-btn--menu {
+		margin-right: 6px;
+	}
+
+	/* Mobile drawer — temporary, not pinned next to content */
+	.v-navigation-drawer.tw-sidebar.tw-sidebar--mobile {
+		box-shadow: var(--tw-shadow-md) !important;
+	}
+
+	/* Page header / toolbar / table all share the same horizontal padding */
+	.tw-page,
+	.tw-toolbar,
+	.tw-filterbar,
+	.tw-table-wrap {
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+
+	.tw-page {
+		padding-top: 16px;
+		padding-bottom: 8px;
+	}
+
+	.tw-page__title {
+		font-size: 18px;
+	}
+
+	/* Toolbar — tabs scroll horizontally already; let the actions stay on the same row */
+	.tw-toolbar {
+		gap: 8px;
+		min-height: 44px;
+	}
+
+	/* On phones the actions can't overlap the title — give the bar its own row */
+	.tw-toolbar--bare {
+		margin-top: 0;
+		margin-bottom: 0;
+		padding-top: 0;
+	}
+
+	.tw-tab {
+		padding: 8px 10px;
+		font-size: 12px;
+	}
+
+	/* Filter bar — single horizontal scroll instead of stacking 3 rows */
+	.tw-filterbar {
+		gap: 8px;
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+
+	.tw-filterbar__group {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: none;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.tw-filterbar__group::-webkit-scrollbar { display: none; }
+
+	.tw-filterbar__label {
+		flex-shrink: 0;
+	}
+
+	/* Table wrap — let the table itself scroll horizontally,
+	   but trim padding + collapse to no outer border on the narrowest screens. */
+	.tw-table-wrap {
+		padding-top: 12px;
+		padding-bottom: 24px;
+	}
+
+	.v-application .v-data-table.tw-table .v-data-table__wrapper {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	/* Slightly tighter rows */
+	.v-application .tw-table tbody td,
+	.v-application .tw-table thead th {
+		padding: 8px 10px !important;
+	}
+
+	/* Vuetify's footer (rows-per-page + paginator) wraps awkwardly on narrow screens */
+	.v-application .tw-table .v-data-footer {
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		row-gap: 4px;
+	}
+
+	.v-application .tw-table .v-data-footer__select { margin: 0 8px 0 0 !important; }
+	.v-application .tw-table .v-data-footer__pagination { margin: 0 8px !important; }
+
+	/* Selection bar — wrap actions onto a second row instead of squashing */
+	.tw-selbar {
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	/* Dialogs — leave a comfortable gutter, don't cling to the screen edge */
+	.v-application .v-dialog:not(.v-dialog--fullscreen) {
+		margin: 12px;
+	}
+
+	.v-dialog.tw-palette__dialog {
+		margin: 12px !important;
+		margin-top: 6vh !important;
+	}
+
+	.tw-palette__hint {
+		flex-wrap: wrap;
+		row-gap: 6px;
+	}
+
+	/* Tags / Projects index — same horizontal gutter as everything else */
+	.tw-tags-index,
+	.tw-projects-index {
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+}
+
+/* Phones — hide low-priority columns so the table doesn't horizontally explode.
+   Description, project, due date, and the action icons are the must-haves. */
+@media (max-width: 600px) {
+	.tw-page {
+		padding-top: 12px;
+	}
+
+	.tw-page__title { font-size: 17px; }
+
+	/* Hide: priority, scheduled, until, tags, urgency, assignee.
+	   These map to data-table columns by header text via Vuetify's <thead>;
+	   we target by the cell's data-label / nth-child instead, which Vuetify
+	   doesn't expose, so we rely on aria-label on each <th> generated from
+	   the column 'text'. Vuetify outputs no such aria, so we resort to
+	   nth-child — keeping the visual columns intact while shrinking the rest.
+
+	   The render order from TaskList.vue headers is:
+	   1: complete  2: description  3: project  (4: assignee?)
+	   then: priority, scheduled, [recur?,] due/wait, until, tags, urgency, actions
+
+	   Rather than juggle nth-child counts (which break the moment a header
+	   toggles), we just enable horizontal scroll and let the user swipe.
+	   This avoids brittle CSS that breaks every time a column is toggled. */
+
+	.tw-table-wrap {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.v-application .v-data-table.tw-table {
+		border-left: none;
+		border-right: none;
+		border-radius: 0 !important;
+	}
+
+	/* Profile chip — push to its own line so it doesn't truncate descriptions */
+	.tw-profile-chip {
+		display: inline-block;
+		margin-left: 4px;
+		font-size: 10px;
+	}
+}
