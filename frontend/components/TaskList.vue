@@ -989,9 +989,15 @@ export default defineComponent({
 			}
 			swipeCleanup(tr);
 			swipeState = {
-				tr, uuid, pointerId: e.pointerId,
-				startX: e.clientX, startY: e.clientY, direction: null,
-				lastTransform: '', lastSide: null, lastArmed: false
+				tr,
+				uuid,
+				pointerId: e.pointerId,
+				startX: e.clientX,
+				startY: e.clientY,
+				direction: null,
+				lastTransform: '',
+				lastSide: null,
+				lastArmed: false
 			};
 			window.addEventListener('pointermove', onSwipeMove);
 			window.addEventListener('pointerup', onSwipeEnd);
