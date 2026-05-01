@@ -344,11 +344,34 @@ import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
 import { accessorType, isCrossProfileView } from '../store';
 
+// True when the stored date has no meaningful time component.
+// Two cases land here: user-entered date-only values (parsed as local midnight)
+// and legacy Todoist imports anchored at UTC midnight (`...T000000Z`).
+function hasNoTime(str?: string): boolean {
+	if (!str) return false;
+	const m = moment(str);
+	if (!m.isValid()) return false;
+	if (m.hour() === 0 && m.minute() === 0 && m.second() === 0) return true;
+	const u = m.clone().utc();
+	return u.hour() === 0 && u.minute() === 0 && u.second() === 0;
+}
+
 function displayDate(str?: string) {
 	if (!str)
 		return str;
 
 	const date = moment(str);
+
+	if (hasNoTime(str)) {
+		const today = moment().startOf('day');
+		const diffDays = date.clone().startOf('day').diff(today, 'days');
+		if (diffDays === 0) return 'today';
+		if (diffDays === 1) return 'tomorrow';
+		if (diffDays === -1) return 'yesterday';
+		if (diffDays > 1 && diffDays < 7) return date.format('dddd');
+		return date.format('YYYY-MM-DD');
+	}
+
 	const diff = moment.duration(date.diff(moment()));
 	if (Math.abs(diff.asDays()) < 1)
 		return diff.humanize(true);
@@ -373,6 +396,10 @@ function expiredDate(str?: string) {
 		return false;
 
 	const date = moment(str);
+	// All-day tasks aren't overdue until the day itself ends — otherwise a
+	// task added "today" via quick-add shows as red from the moment it's saved.
+	if (hasNoTime(str))
+		return date.clone().endOf('day').isBefore(moment());
 	return date.isBefore(moment());
 }
 

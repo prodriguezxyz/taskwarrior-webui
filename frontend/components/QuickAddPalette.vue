@@ -119,26 +119,29 @@ function dayIndexOf(tok: string): number {
 	return DAY_NAMES_SHORT.indexOf(lower);
 }
 
-function dayOfWeekFrom(targetDow: number, weeksAhead = 0): moment.Moment {
+// Date tokens are intentionally date-only (YYYY-MM-DD): the user typed a day,
+// not a time, so we don't fabricate one. The list / today filters all treat
+// midnight as "all-day"; see hasNoTime() in TaskList.vue.
+function dayOfWeekFrom(targetDow: number, weeksAhead = 0): string {
 	const m = moment();
 	const today = m.day();
 	let diff = targetDow - today;
 	if (diff <= 0) diff += 7;
 	diff += 7 * weeksAhead;
-	return m.add(diff, 'day').endOf('day');
+	return m.add(diff, 'day').format('YYYY-MM-DD');
 }
 
 function parseDateToken(tok: string): string | undefined {
 	const lower = tok.toLowerCase();
 
-	if (lower === 'today') return moment().endOf('day').toISOString();
-	if (lower === 'tomorrow') return moment().add(1, 'day').endOf('day').toISOString();
+	if (lower === 'today') return moment().format('YYYY-MM-DD');
+	if (lower === 'tomorrow') return moment().add(1, 'day').format('YYYY-MM-DD');
 
-	if (lower === 'eod') return moment().endOf('day').toISOString();
-	if (lower === 'eow') return moment().endOf('isoWeek').toISOString();
-	if (lower === 'eom') return moment().endOf('month').toISOString();
-	if (lower === 'eoy') return moment().endOf('year').toISOString();
-	if (lower === 'weekend') return dayOfWeekFrom(6).toISOString();
+	if (lower === 'eod') return moment().format('YYYY-MM-DD');
+	if (lower === 'eow') return moment().endOf('isoWeek').format('YYYY-MM-DD');
+	if (lower === 'eom') return moment().endOf('month').format('YYYY-MM-DD');
+	if (lower === 'eoy') return moment().endOf('year').format('YYYY-MM-DD');
+	if (lower === 'weekend') return dayOfWeekFrom(6);
 
 	// "next monday", "next mon", "this monday" come in pre-merged as "nextmonday" / "thismon"
 	let weekOffset = 0;
@@ -152,11 +155,11 @@ function parseDateToken(tok: string): string | undefined {
 		dayTok = lower.slice(4);
 	}
 
-	if (weekOffset === 1 && dayTok === 'week') return moment().add(1, 'week').endOf('day').toISOString();
-	if (weekOffset === 1 && dayTok === 'month') return moment().add(1, 'month').endOf('day').toISOString();
+	if (weekOffset === 1 && dayTok === 'week') return moment().add(1, 'week').format('YYYY-MM-DD');
+	if (weekOffset === 1 && dayTok === 'month') return moment().add(1, 'month').format('YYYY-MM-DD');
 
 	const dayIdx = dayIndexOf(dayTok);
-	if (dayIdx !== -1) return dayOfWeekFrom(dayIdx, weekOffset).toISOString();
+	if (dayIdx !== -1) return dayOfWeekFrom(dayIdx, weekOffset);
 
 	const relMatch = /^\+(\d+)([dwmy])$/.exec(lower);
 	if (relMatch) {
@@ -167,12 +170,12 @@ function parseDateToken(tok: string): string | undefined {
 			m: 'months',
 			y: 'years'
 		};
-		return moment().add(n, unitMap[relMatch[2]]).endOf('day').toISOString();
+		return moment().add(n, unitMap[relMatch[2]]).format('YYYY-MM-DD');
 	}
 
 	if (/^\d{4}-\d{2}-\d{2}$/.test(lower)) {
 		const m = moment(lower, 'YYYY-MM-DD', true);
-		if (m.isValid()) return m.endOf('day').toISOString();
+		if (m.isValid()) return lower;
 	}
 
 	return undefined;

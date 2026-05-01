@@ -109,6 +109,22 @@ import { accessorType } from '../store';
 function displayDate(str?: string) {
 	if (!str) return '';
 	const date = moment(str);
+
+	// Date-only values land at midnight (local for user-entered, UTC for legacy
+	// Todoist imports) — render them as a day label, not "X hours ago".
+	const localMidnight = date.hour() === 0 && date.minute() === 0 && date.second() === 0;
+	const u = date.clone().utc();
+	const utcMidnight = u.hour() === 0 && u.minute() === 0 && u.second() === 0;
+	if (localMidnight || utcMidnight) {
+		const today = moment().startOf('day');
+		const diffDays = date.clone().startOf('day').diff(today, 'days');
+		if (diffDays === 0) return 'today';
+		if (diffDays === 1) return 'tomorrow';
+		if (diffDays === -1) return 'yesterday';
+		if (diffDays > 1 && diffDays < 7) return date.format('dddd');
+		return date.format('YYYY-MM-DD');
+	}
+
 	const diff = moment.duration(date.diff(moment()));
 	if (Math.abs(diff.asDays()) < 1)
 		return diff.humanize(true);
