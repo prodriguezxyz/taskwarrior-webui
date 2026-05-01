@@ -225,6 +225,17 @@
 		<v-main>
 			<nuxt />
 		</v-main>
+
+		<button
+			v-if="isMobile && !fabHidden"
+			type="button"
+			class="tw-fab"
+			title="New task"
+			aria-label="New task"
+			@click="openNewTask"
+		>
+			<v-icon size="26" aria-hidden="true">mdi-plus</v-icon>
+		</button>
 	</v-app>
 </template>
 
@@ -420,6 +431,16 @@ export default defineComponent({
 		);
 		provide('layoutDialogsOpen', layoutDialogsOpen);
 
+		// Hide the mobile FAB when anything else is on top — drawer, palette,
+		// task dialog, settings, etc. — so it doesn't poke through overlays.
+		const fabHidden = computed(() =>
+			mobileDrawer.value
+			|| store.state.quickAddOpen
+			|| store.state.searchOpen
+			|| store.state.taskDialog.open
+			|| layoutDialogsOpen.value
+		);
+
 		let gPending = false;
 		let gTimer: number | null = null;
 		const armG = () => {
@@ -493,6 +514,7 @@ export default defineComponent({
 			get: () => context.$vuetify.theme.dark,
 			set: val => {
 				context.$vuetify.theme.dark = val;
+				store.dispatch('updateSettings', { ...store.state.settings, dark: val });
 			}
 		});
 
@@ -581,6 +603,7 @@ export default defineComponent({
 			isMobile,
 			mobileDrawer,
 			MOBILE_DRAWER_WIDTH,
+			fabHidden,
 
 			SettingsDialog,
 			TaskDialog,
