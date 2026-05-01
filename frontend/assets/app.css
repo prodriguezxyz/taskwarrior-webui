@@ -1969,11 +1969,14 @@ button.tw-icon-btn:focus-visible {
 }
 
 /* Allow vertical scroll while we capture horizontal pans for swipe.
-   Applied to the block-level wrap rather than the <tr>: WebKit/Safari (and
-   some Android browsers) ignore touch-action on display: table-row, so the
-   browser ate horizontal pans before they reached our pointer handler. */
+   Has to be set on .v-data-table__wrapper specifically: Vuetify gives that
+   element `overflow-x: auto`, which makes the browser claim pan-x for its
+   own horizontal scrolling regardless of an ancestor's touch-action. The
+   wrapper's own touch-action wins, so set pan-y there. We also keep it on
+   .tw-table-wrap as a belt-and-braces in case the wrapper class changes. */
 @media (hover: none) {
-	.v-application .tw-table-wrap {
+	.v-application .tw-table-wrap,
+	.v-application .tw-table .v-data-table__wrapper {
 		touch-action: pan-y;
 	}
 }
@@ -2341,6 +2344,16 @@ button.tw-icon-btn:focus-visible {
 		display: block;
 		white-space: normal;
 		line-height: 1.45;
+	}
+
+	/* Pull the description tight against the complete circle — on a phone
+	   the default desktop gutter wastes horizontal space and pushes the
+	   text uncomfortably far from the tap target. */
+	.v-application .tw-table tbody td.tw-td--compact {
+		padding-right: 4px !important;
+	}
+	.v-application .tw-table tbody td.tw-td--compact + td {
+		padding-left: 4px !important;
 	}
 
 	/* Compact actions on phone: only the delete icon stays */
