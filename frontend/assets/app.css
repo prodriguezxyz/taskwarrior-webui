@@ -118,9 +118,15 @@ button,
 .tw-chip-filter,
 .tw-sidebar__item,
 .tw-rowaction,
-.tw-complete,
-.v-data-table tbody tr {
+.tw-complete {
 	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Rows aren't in the list above on purpose: `manipulation` lets the browser
+   claim horizontal pans for itself, which kills the swipe-to-complete /
+   swipe-to-delete gesture. Tap-highlight removal still applies. */
+.v-data-table tbody tr {
 	-webkit-tap-highlight-color: transparent;
 }
 
@@ -1962,9 +1968,12 @@ button.tw-icon-btn:focus-visible {
 	color: var(--tw-danger);
 }
 
-/* Allow vertical scroll while we capture horizontal pans for swipe. */
+/* Allow vertical scroll while we capture horizontal pans for swipe.
+   Applied to the block-level wrap rather than the <tr>: WebKit/Safari (and
+   some Android browsers) ignore touch-action on display: table-row, so the
+   browser ate horizontal pans before they reached our pointer handler. */
 @media (hover: none) {
-	.v-application .tw-table tbody tr:not(.v-row-group__header) {
+	.v-application .tw-table-wrap {
 		touch-action: pan-y;
 	}
 }
