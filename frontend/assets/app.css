@@ -2264,25 +2264,31 @@ button.tw-icon-btn:focus-visible {
 		font-size: 10px;
 	}
 
-	/* Show the sub-row (project / due / priority / tags) under each description */
+	/* Show the sub-row (project / due / priority / tags) under each description.
+	   Single-line "project · today · P1 · #tag" reading; icons dropped because on
+	   mobile every item is the same kind of meta — the labels carry enough signal. */
 	.tw-description__sub {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 4px 8px;
-		margin-top: 4px;
+		gap: 2px 6px;
+		margin-top: 2px;
 		font-size: 11px;
 		color: var(--tw-text-muted);
-		line-height: 1.4;
+		line-height: 1.35;
+	}
+
+	/* Middot between adjacent items, hidden when wrapping to a new line */
+	.tw-description__sub > * + *::before {
+		content: '·';
+		margin-right: 6px;
+		color: var(--tw-text-faint);
 	}
 
 	.tw-description__sub-meta {
 		display: inline-flex;
 		align-items: center;
-		gap: 3px;
 	}
-
-	.tw-description__sub-meta .v-icon { color: var(--tw-text-faint) !important; }
 
 	.tw-description__sub-meta--overdue {
 		color: var(--tw-danger);

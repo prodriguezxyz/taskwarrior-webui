@@ -236,7 +236,6 @@
 					</span>
 					<div v-if="isMobile" class="tw-description__sub">
 						<span v-if="item.project" class="tw-description__sub-meta">
-							<v-icon size="11" aria-hidden="true">mdi-folder-outline</v-icon>
 							{{ item.project }}
 						</span>
 						<span
@@ -244,7 +243,6 @@
 							class="tw-description__sub-meta"
 							:class="dueMetaClass(item)"
 						>
-							<v-icon size="11" aria-hidden="true">mdi-calendar-outline</v-icon>
 							{{ displayDate(item.due) }}
 						</span>
 						<span
@@ -596,7 +594,9 @@ export default defineComponent({
 			return true;
 		};
 
-		const isOverdue = (task: Task) => !!task.due && moment(task.due).isBefore(moment());
+		// Defer to expiredDate so all-day tasks (no time component) aren't bucketed
+		// into Overdue mid-day — only after their day actually ends.
+		const isOverdue = (task: Task) => expiredDate(task.due);
 
 		// All status buckets in one computed map: simpler reactivity than a
 		// reactive() of refs, which had inconsistent unwrapping under Vue 2 +
@@ -651,7 +651,6 @@ export default defineComponent({
 		const currentItems = computed((): Task[] => classifiedTasks.value[status.value] || []);
 
 		const groupBy = computed((): string | undefined => {
-			if (!projectFilter.value && !sidebarTagFilter.value) return undefined;
 			if (status.value !== 'today' && status.value !== 'pending') return undefined;
 			const arr = classifiedTasks.value[status.value] || [];
 			const groups = new Set(arr.map((t: any) => t._group));
