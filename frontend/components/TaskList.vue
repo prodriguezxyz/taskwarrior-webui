@@ -253,7 +253,7 @@
 							:class="'tw-description__sub-prio--' + item.priority"
 						>P{{ item.priority }}</span>
 						<span
-							v-for="tag in item.tags"
+							v-for="tag in visibleTags(item)"
 							:key="tag"
 							class="tw-description__sub-tag"
 						>#{{ tag }}</span>
@@ -285,7 +285,7 @@
 
 				<template v-slot:item.tags="{ item }">
 					<v-chip
-						v-for="tag in item.tags"
+						v-for="tag in visibleTags(item)"
 						:key="tag"
 						small
 					>
@@ -876,6 +876,17 @@ export default defineComponent({
 			return '';
 		};
 
+		// Tags rendered on the row, with the user's hidden-tag list filtered out.
+		// Hidden tags are still indexed (Tags sidebar) and queryable — they just
+		// don't clutter every row. Empty result is fine; consumers v-for over it.
+		const hiddenTagSet = computed(() => new Set(store.state.settings.hiddenTags || []));
+		const visibleTags = (item: Task): string[] => {
+			if (!item.tags || !item.tags.length) return [];
+			const hidden = hiddenTagSet.value;
+			if (!hidden.size) return item.tags;
+			return item.tags.filter(t => !hidden.has(t));
+		};
+
 		const rowClass = (item: Task) => {
 			const sel = selected.value.some(t => t.uuid === item.uuid) ? 'tw-row--selected' : '';
 			const cur = cursorUuid.value === item.uuid ? 'tw-row--cursor' : '';
@@ -1157,6 +1168,7 @@ export default defineComponent({
 			displayDate,
 			dueMetaClass,
 			rowClass,
+			visibleTags,
 			selectStatus,
 			tabCount,
 			statusLabels,

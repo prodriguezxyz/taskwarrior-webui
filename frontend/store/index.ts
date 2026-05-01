@@ -23,7 +23,10 @@ export const state = () => ({
 		dark: false,
 		autoRefresh: '5', // in minutes
 		autoSync: '0', // in minutes
-		profile: ''
+		profile: '',
+		// Tags hidden from the row display (still indexed/searchable). Default
+		// covers the bulk "imported" tag a user is likely carrying around.
+		hiddenTags: ['todoist-import'] as string[]
 	},
 	hiddenColumns: [] as string[],
 	profiles: [] as Array<{ name: string }>,
