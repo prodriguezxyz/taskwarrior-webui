@@ -24,6 +24,9 @@ export const state = () => ({
 		autoRefresh: '5', // in minutes
 		autoSync: '0', // in minutes
 		profile: '',
+		// Today view: 'mine' shows tasks assigned to me or unassigned; 'all'
+		// shows everything (useful in shared profiles to see what others have).
+		todayScope: 'mine' as 'mine' | 'all',
 		// Tags hidden from the row display (still indexed/searchable). Default
 		// covers the bulk "imported" tag a user is likely carrying around.
 		hiddenTags: ['todoist-import'] as string[]
@@ -83,6 +86,16 @@ export const getters: GetterTree<RootState, RootState> = {
 		if (state.profiles.length <= 1) return state.tasks;
 		const active = state.settings.profile;
 		return state.tasks.filter(t => (t as TaskWithProfile)._profile === active);
+	},
+	// Today scope: 'mine' keeps tasks the user owns or that nobody owns;
+	// 'all' includes tasks assigned to other members. Used by the Today
+	// view, the sidebar count, and the page header count.
+	inTodayScope: (state) => (task: Task): boolean => {
+		if (state.settings.todayScope === 'all') return true;
+		const a = (task as any).assignee;
+		if (!a) return true;
+		const me = state.user?.email;
+		return !!me && a === me;
 	}
 };
 

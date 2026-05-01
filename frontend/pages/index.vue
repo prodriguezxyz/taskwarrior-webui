@@ -110,6 +110,7 @@ export default defineComponent({
 				const now = moment();
 				return store.state.tasks.filter((t: Task) => {
 					if (t.status !== 'pending') return false;
+					if (!store.getters.inTodayScope(t)) return false;
 					const waiting = (t.wait && moment(t.wait).isAfter(now))
 						|| (t.scheduled && moment(t.scheduled).isAfter(now));
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);

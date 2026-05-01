@@ -302,6 +302,7 @@ export default defineComponent({
 			const endOfToday = moment().endOf('day');
 			const now = moment();
 			return pendingTasks.value.filter((t: any) => {
+				if (!store.getters.inTodayScope(t)) return false;
 				const waiting = (t.wait && moment(t.wait).isAfter(now))
 					|| (t.scheduled && moment(t.scheduled).isAfter(now));
 				return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);

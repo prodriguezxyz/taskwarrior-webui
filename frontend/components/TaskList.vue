@@ -8,7 +8,7 @@
 		/>
 		<ColumnDialog v-model="showColumnDialog" :active-columns="configurableHeaders" />
 
-		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter && view !== 'mine' }">
+		<div class="tw-toolbar" :class="{ 'tw-toolbar--bare': !projectFilter && !sidebarTagFilter && view !== 'mine' && !showTodayScopeToggle }">
 			<nav v-if="projectFilter || sidebarTagFilter || view === 'mine'" class="tw-tabs" role="tablist">
 				<button
 					v-for="st in allStatus"
@@ -29,6 +29,29 @@
 						v-if="tabCount(st) > 0"
 						class="tw-tab__count"
 					>{{ tabCount(st) }}</span>
+				</button>
+			</nav>
+
+			<nav
+				v-else-if="showTodayScopeToggle"
+				class="tw-tabs"
+				role="tablist"
+				aria-label="Today scope"
+			>
+				<button
+					v-for="opt in todayScopeOptions"
+					:key="opt.value"
+					type="button"
+					role="tab"
+					:aria-selected="opt.value === todayScope"
+					class="tw-tab"
+					:class="{ 'tw-tab--active': opt.value === todayScope }"
+					@click="setTodayScope(opt.value)"
+				>
+					<v-icon size="15" class="tw-tab__icon" aria-hidden="true">
+						{{ opt.icon }}
+					</v-icon>
+					<span class="tw-tab__label">{{ opt.label }}</span>
 				</button>
 			</nav>
 
@@ -467,6 +490,32 @@ export default defineComponent({
 			store.getters.multiProfile && isCrossProfileView(view.value)
 		);
 
+		type TodayScope = 'mine' | 'all';
+		const todayScope = computed<TodayScope>(() => store.state.settings.todayScope);
+		const todayScopeOptions: Array<{ value: TodayScope, label: string, icon: string }> = [
+			{ value: 'mine', label: 'Mine', icon: 'mdi-account-outline' },
+			{ value: 'all', label: 'All', icon: 'mdi-account-group-outline' }
+		];
+		const setTodayScope = (value: TodayScope) => {
+			if (value === todayScope.value) return;
+			store.dispatch('updateSettings', {
+				...store.state.settings,
+				todayScope: value
+			});
+		};
+		// Toggle is only useful when there's at least one task assigned to
+		// someone other than the current user — otherwise both options yield
+		// the same list and the toggle would be noise.
+		const showTodayScopeToggle = computed(() => {
+			if (view.value !== 'today') return false;
+			const me = store.state.user?.email;
+			return (props.tasks ?? []).some(t => {
+				if (t.status !== 'pending') return false;
+				const a = (t as any).assignee;
+				return !!a && a !== me;
+			});
+		});
+
 		const hide = (bp: 'sm' | 'xs') => ({
 			class: `tw-col--hide-${bp}`,
 			cellClass: `tw-col--hide-${bp}`
@@ -542,7 +591,7 @@ export default defineComponent({
 			|| priorityFilter.value !== null
 		);
 
-		watch([tagFilter, assigneeFilter, priorityFilter], () => {
+		watch([tagFilter, assigneeFilter, priorityFilter, todayScope], () => {
 			selected.value = [];
 		});
 
@@ -591,6 +640,7 @@ export default defineComponent({
 				const me = store.state.user?.email;
 				if (!me || (task as any).assignee !== me) return false;
 			}
+			if (view.value === 'today' && !store.getters.inTodayScope(task)) return false;
 			return true;
 		};
 
@@ -1189,6 +1239,10 @@ export default defineComponent({
 			togglePriority,
 			clearFilters,
 			showProfileChip,
+			todayScope,
+			todayScopeOptions,
+			setTodayScope,
+			showTodayScopeToggle,
 			isMobile,
 			onSwipeStart,
 
