@@ -236,6 +236,11 @@
 							class="tw-profile-chip"
 							:title="`Profile: ${item._profile}`"
 						>{{ item._profile }}</span>
+						<span
+							v-if="item._collapsedCount > 0"
+							class="tw-overdue-chip"
+							:title="`${item._collapsedCount} more pending instance${item._collapsedCount === 1 ? '' : 's'} in this recurring series`"
+						>+{{ item._collapsedCount }}</span>
 					</span>
 					<div v-if="isMobile" class="tw-description__sub">
 						<span v-if="item.project" class="tw-description__sub-meta">
@@ -344,6 +349,7 @@ import moment from 'moment';
 import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
 import { accessorType, isCrossProfileView } from '../store';
+import { collapseRecurring } from '../utils/collapse';
 
 // True when the stored date has no meaningful time component.
 // Two cases land here: user-entered date-only values (parsed as local midnight)
@@ -518,7 +524,7 @@ export default defineComponent({
 			{ text: 'Until', value: 'until', ...hide('sm') },
 			{ text: 'Tags', value: 'tags', ...hide('xs') },
 			{ text: 'Urgency', value: 'urgency', sort: (a: number, b: number) => b - a, ...hide('sm') },
-			{ text: 'Actions', value: 'actions', sortable: false, ...hide('xs') }
+			{ text: 'Actions', value: 'actions', sortable: false }
 		]);
 
 		const filteredHeaders = computed(() =>
@@ -660,6 +666,7 @@ export default defineComponent({
 					return matchesFilters(task);
 				});
 			}
+			out.today = collapseRecurring(out.today);
 			return out;
 		});
 
@@ -777,9 +784,34 @@ export default defineComponent({
 		};
 
 		const completeTasks = async (tasks: Task[]) => {
-			const originals = tasks.map(t => _.cloneDeep(t));
+			// Expand collapsed-recurring rows: a representative carries `_siblingUuids`
+			// for every pending instance of its parent series. Resolve them against the
+			// store so we send the real Task objects (not the shallow clone), dedupe, and
+			// drop anything that already left `pending` between render and click.
+			const seen = new Set<string>();
+			const expanded: Task[] = [];
+			for (const t of tasks) {
+				const siblingUuids = (t as any)._siblingUuids as string[] | undefined;
+				if (siblingUuids && siblingUuids.length > 1) {
+					for (const uuid of siblingUuids) {
+						if (seen.has(uuid)) continue;
+						const real = store.state.tasks.find((s: Task) => s.uuid === uuid);
+						if (real && real.status === 'pending') {
+							seen.add(uuid);
+							expanded.push(real);
+						}
+					}
+				}
+				else if (t.uuid && !seen.has(t.uuid)) {
+					seen.add(t.uuid);
+					expanded.push(t);
+				}
+			}
+			if (expanded.length === 0) return;
+
+			const originals = expanded.map(t => _.cloneDeep(t));
 			try {
-				await store.dispatch('updateTasks', tasks.map(task => {
+				await store.dispatch('updateTasks', expanded.map(task => {
 					return {
 						...task,
 						status: 'completed'
@@ -789,14 +821,14 @@ export default defineComponent({
 			catch (err) {
 				store.commit('setNotification', {
 					color: 'error',
-					text: tasks.length === 1 ? 'Failed to complete task' : `Failed to complete ${tasks.length} tasks`
+					text: expanded.length === 1 ? 'Failed to complete task' : `Failed to complete ${expanded.length} tasks`
 				});
 				return;
 			}
-			selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
+			selected.value = selected.value.filter(task => expanded.findIndex(t => t.uuid === task.uuid) === -1);
 			store.commit('setNotification', {
 				color: 'success',
-				text: tasks.length === 1 ? 'Task completed' : `${tasks.length} tasks completed`,
+				text: expanded.length === 1 ? 'Task completed' : `${expanded.length} tasks completed`,
 				actionText: 'Undo',
 				actionHandler: () => undoTasks(originals)
 			});
@@ -1111,5 +1143,20 @@ export default defineComponent({
 	background: transparent;
 	vertical-align: middle;
 	white-space: nowrap;
+}
+
+.tw-overdue-chip {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	border: 1px solid rgba(127, 127, 127, 0.35);
+	font-size: 11px;
+	line-height: 1.4;
+	color: rgba(127, 127, 127, 0.95);
+	background: transparent;
+	vertical-align: middle;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
 }
 </style>

@@ -27,6 +27,7 @@ import TagsIndex from '../components/TagsIndex.vue';
 import ProjectsIndex from '../components/ProjectsIndex.vue';
 import { Task } from 'taskwarrior-lib';
 import { accessorType } from '../store';
+import { collapseRecurring } from '../utils/collapse';
 
 export default defineComponent({
 	setup() {
@@ -115,13 +116,14 @@ export default defineComponent({
 			if (view.value === 'today') {
 				const endOfToday = moment().endOf('day');
 				const now = moment();
-				return store.state.tasks.filter((t: Task) => {
+				const todayList = store.state.tasks.filter((t: Task) => {
 					if (t.status !== 'pending') return false;
 					if (!store.getters.inTodayScope(t)) return false;
 					const waiting = (t.wait && moment(t.wait).isAfter(now))
 						|| (t.scheduled && moment(t.scheduled).isAfter(now));
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
-				}).length;
+				});
+				return collapseRecurring(todayList).length;
 			}
 			if (view.value === 'mine') {
 				const me = store.state.user?.email;

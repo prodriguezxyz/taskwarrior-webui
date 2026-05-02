@@ -249,6 +249,7 @@ import QuickAddPalette from '../components/QuickAddPalette.vue';
 import ProjectManageDialog from '../components/ProjectManageDialog.vue';
 import ShortcutsHelp from '../components/ShortcutsHelp.vue';
 import { accessorType } from '../store';
+import { collapseRecurring } from '../utils/collapse';
 
 export default defineComponent({
 	setup(_props, _ctx) {
@@ -301,12 +302,13 @@ export default defineComponent({
 		const todayCount = computed(() => {
 			const endOfToday = moment().endOf('day');
 			const now = moment();
-			return pendingTasks.value.filter((t: any) => {
+			const todayList = pendingTasks.value.filter((t: any) => {
 				if (!store.getters.inTodayScope(t)) return false;
 				const waiting = (t.wait && moment(t.wait).isAfter(now))
 					|| (t.scheduled && moment(t.scheduled).isAfter(now));
 				return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
-			}).length;
+			});
+			return collapseRecurring(todayList).length;
 		});
 
 		const hasMembers = computed(() => store.state.members.length > 1);

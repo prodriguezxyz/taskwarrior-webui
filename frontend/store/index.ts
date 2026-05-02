@@ -300,8 +300,12 @@ export const actions: ActionTree<RootState, RootState> = {
 			}
 		}
 		finally {
-			try { await context.dispatch('fetchTasks'); }
-			catch (err) { console.error('[store] fetchTasks after delete failed:', err); }
+			try {
+				await context.dispatch('fetchTasks');
+			}
+			catch (err) {
+				console.error('[store] fetchTasks after delete failed:', err);
+			}
 		}
 	},
 
@@ -318,8 +322,12 @@ export const actions: ActionTree<RootState, RootState> = {
 			}
 		}
 		finally {
-			try { await context.dispatch('fetchTasks'); }
-			catch (err) { console.error('[store] fetchTasks after update failed:', err); }
+			try {
+				await context.dispatch('fetchTasks');
+			}
+			catch (err) {
+				console.error('[store] fetchTasks after update failed:', err);
+			}
 		}
 	},
 
@@ -366,7 +374,7 @@ function groupByProfile(tasks: Task[]): Map<string | null, Task[]> {
 	return groups;
 }
 
-const INTERNAL_FIELDS = ['_profile'];
+const INTERNAL_FIELDS = ['_profile', '_collapsedCount', '_siblingUuids'];
 function stripInternalFields(task: Task): Task {
 	const out: any = {};
 	for (const k of Object.keys(task)) {
