@@ -2,7 +2,7 @@ import { ActionTree, MutationTree, GetterTree } from 'vuex';
 import { Task } from 'taskwarrior-lib';
 import { getAccessorType } from 'typed-vuex';
 
-export type TaskWithProfile = Task & { _profile?: string; _group?: string };
+export type TaskWithProfile = Task & { _profile?: string };
 export type ViewName = 'all' | 'today' | 'tags' | 'projects' | 'mine';
 export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'mine']);
 export function isCrossProfileView(view: ViewName): boolean {
@@ -352,7 +352,7 @@ function groupByProfile(tasks: Task[]): Map<string | null, Task[]> {
 	return groups;
 }
 
-const INTERNAL_FIELDS = ['_profile', '_group'];
+const INTERNAL_FIELDS = ['_profile'];
 function stripInternalFields(task: Task): Task {
 	const out: any = {};
 	for (const k of Object.keys(task)) {

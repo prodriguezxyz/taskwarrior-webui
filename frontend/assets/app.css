@@ -1528,55 +1528,6 @@ button.tw-icon-btn:focus-visible {
 
 .v-application .tw-table tbody tr:last-child td { border-bottom: none !important; }
 
-/* Group header row (Overdue / Today / Upcoming) */
-.v-application .tw-table tbody tr.v-row-group__header,
-.v-application .tw-table tbody tr.v-row-group__header:hover {
-	background: var(--tw-surface) !important;
-}
-
-.v-application .tw-table tbody tr.v-row-group__header td {
-	padding: 0 !important;
-	border-bottom: 1px solid var(--tw-border) !important;
-}
-
-.tw-group-header {
-	padding: 0 !important;
-}
-
-.tw-group-header__toggle {
-	appearance: none;
-	background: transparent;
-	border: none;
-	width: 100%;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 8px 14px;
-	font-family: var(--tw-font);
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--tw-text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	cursor: pointer;
-	text-align: left;
-}
-
-.tw-group-header__toggle:hover { color: var(--tw-text); }
-
-.tw-group-header__toggle--overdue { color: var(--tw-danger); }
-.tw-group-header__toggle--overdue:hover { color: var(--tw-danger); opacity: 0.85; }
-
-.tw-group-header__count {
-	font-weight: 500;
-	color: var(--tw-text-faint);
-	text-transform: none;
-	letter-spacing: 0;
-	margin-left: 4px;
-}
-
-.tw-group-header__toggle--overdue .tw-group-header__count { color: var(--tw-danger); opacity: 0.7; }
-
 /* Status indicator — subtle tint + left accent bar */
 .v-application .tw-table tbody tr.recur-task td:first-child,
 .v-application .tw-table tbody tr.urgent-task td:first-child,

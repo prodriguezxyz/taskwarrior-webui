@@ -203,7 +203,6 @@
 				:headers="filteredHeaders"
 				item-key="uuid"
 				:item-class="rowClass"
-				:group-by="groupBy"
 				:items-per-page="20"
 				:footer-props="{ 'items-per-page-options': [10, 20, 50, 100, -1] }"
 				:mobile-breakpoint="0"
@@ -211,23 +210,6 @@
 				style="width: 100%"
 				@click:row="onRowClick"
 			>
-				<template v-slot:group.header="{ group, items, isOpen, toggle, headers: hdrs }">
-					<tr class="v-row-group__header tw-group-row">
-						<td :colspan="hdrs.length" class="tw-group-header">
-							<button
-								type="button"
-								class="tw-group-header__toggle"
-								:class="{ 'tw-group-header__toggle--overdue': group === 'Overdue' }"
-								@click="toggle"
-							>
-								<v-icon size="14" aria-hidden="true">{{ isOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
-								<span>{{ group }}</span>
-								<span class="tw-group-header__count">{{ items.length }}</span>
-							</button>
-						</td>
-					</tr>
-				</template>
-
 				<template v-slot:item._complete="{ item }">
 					<button
 						type="button"
@@ -642,10 +624,6 @@ export default defineComponent({
 			return true;
 		};
 
-		// Defer to expiredDate so all-day tasks (no time component) aren't bucketed
-		// into Overdue mid-day — only after their day actually ends.
-		const isOverdue = (task: Task) => expiredDate(task.due);
-
 		// All status buckets in one computed map: simpler reactivity than a
 		// reactive() of refs, which had inconsistent unwrapping under Vue 2 +
 		// composition-api and broke list refresh after multi-profile writes.
@@ -655,7 +633,7 @@ export default defineComponent({
 			const endOfToday = moment().endOf('day');
 
 			for (const st of classifiedStatuses) {
-				const filtered = tasks.filter(task => {
+				out[st] = tasks.filter(task => {
 					let passStatus: boolean;
 					if (st === 'today') {
 						const waiting = (task.wait && !expiredDate(task.wait))
@@ -681,29 +659,11 @@ export default defineComponent({
 						&& st !== 'today' && (task.project || (task as any).parent)) return false;
 					return matchesFilters(task);
 				});
-
-				if (st === 'today' || st === 'pending') {
-					const todayGroup = st === 'today' ? 'Today' : 'Upcoming';
-					out[st] = filtered.map(t => ({
-						...t,
-						_group: isOverdue(t) ? 'Overdue' : todayGroup
-					})) as Task[];
-				}
-				else {
-					out[st] = filtered as Task[];
-				}
 			}
 			return out;
 		});
 
 		const currentItems = computed((): Task[] => classifiedTasks.value[status.value] || []);
-
-		const groupBy = computed((): string | undefined => {
-			if (status.value !== 'today' && status.value !== 'pending') return undefined;
-			const arr = classifiedTasks.value[status.value] || [];
-			const groups = new Set(arr.map((t: any) => t._group));
-			return groups.size > 1 ? '_group' : undefined;
-		});
 
 		const refresh = () => {
 			store.dispatch('fetchTasks');
@@ -1032,7 +992,6 @@ export default defineComponent({
 			filteredHeaders,
 			configurableHeaders,
 			classifiedTasks,
-			groupBy,
 			status,
 			allStatus,
 			statusIcons,
