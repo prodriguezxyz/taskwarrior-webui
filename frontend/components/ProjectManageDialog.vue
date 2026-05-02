@@ -139,7 +139,16 @@ export default defineComponent({
 				return;
 			}
 
-			await store.dispatch('updateTasks', updated);
+			try {
+				await store.dispatch('updateTasks', updated);
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: `Failed to rename project to ${to}`
+				});
+				return;
+			}
 
 			if (store.state.projectFilter === from) {
 				store.commit('setProjectFilter', to);
@@ -161,7 +170,16 @@ export default defineComponent({
 			const toDelete = deletableTasks.value;
 
 			if (toDelete.length > 0) {
-				await store.dispatch('deleteTasks', toDelete);
+				try {
+					await store.dispatch('deleteTasks', toDelete);
+				}
+				catch (err) {
+					store.commit('setNotification', {
+						color: 'error',
+						text: `Failed to delete project ${from}`
+					});
+					return;
+				}
 			}
 
 			if (store.state.projectFilter === from) {

@@ -41,7 +41,12 @@ export default defineComponent({
 			const freq = +store.state.settings.autoRefresh;
 			if (freq > 0) {
 				refreshInterval = setInterval(() => {
-					store.dispatch('fetchTasks');
+					// Background tick: log and move on. A transient blip shouldn't
+					// pop a toast (the user didn't ask for this refresh) or leave
+					// an unhandled promise rejection.
+					store.dispatch('fetchTasks').catch(err => {
+						console.error('[autoRefresh] fetchTasks failed:', err);
+					});
 				}, +store.state.settings.autoRefresh * 60000);
 			}
 		};
@@ -54,7 +59,9 @@ export default defineComponent({
 			const freq = +store.state.settings.autoSync;
 			if (freq > 0) {
 				syncInterval = setInterval(() => {
-					store.dispatch('syncTasks');
+					store.dispatch('syncTasks').catch(err => {
+						console.error('[autoSync] syncTasks failed:', err);
+					});
 				}, +store.state.settings.autoSync * 60000);
 			}
 		};

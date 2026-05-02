@@ -171,7 +171,21 @@ export default defineComponent({
 		};
 
 		const sync = async () => {
-			await store.dispatch('syncTasks');
+			try {
+				await store.dispatch('syncTasks');
+				store.commit('setNotification', {
+					color: 'success',
+					text: 'Successfully synced tasks.'
+				});
+			}
+			catch (error: any) {
+				const failed: string[] | undefined = error?.failedProfiles;
+				const succeeded: number | undefined = error?.succeededCount;
+				const text = (failed && failed.length)
+					? `Sync failed for: ${failed.join(', ')}` + (succeeded ? ` (${succeeded} ok)` : '')
+					: 'Failed to sync tasks.';
+				store.commit('setNotification', { color: 'error', text });
+			}
 		};
 
 		return {

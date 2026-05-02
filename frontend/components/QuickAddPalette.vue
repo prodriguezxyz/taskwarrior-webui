@@ -406,6 +406,14 @@ export default defineComponent({
 				});
 				close();
 			}
+			catch (err) {
+				// Keep the palette open with the user's input intact so they can retry
+				// without re-typing — closing on error would silently lose the entry.
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Failed to add task'
+				});
+			}
 			finally {
 				submitting.value = false;
 			}

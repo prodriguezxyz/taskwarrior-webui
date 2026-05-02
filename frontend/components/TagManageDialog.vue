@@ -135,7 +135,16 @@ export default defineComponent({
 				return;
 			}
 
-			await store.dispatch('updateTasks', updated);
+			try {
+				await store.dispatch('updateTasks', updated);
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: `Failed to rename tag to ${to}`
+				});
+				return;
+			}
 
 			if (store.state.tagFilter === from) {
 				store.commit('setTagFilter', to);
@@ -160,7 +169,16 @@ export default defineComponent({
 			}));
 
 			if (updated.length > 0) {
-				await store.dispatch('updateTasks', updated);
+				try {
+					await store.dispatch('updateTasks', updated);
+				}
+				catch (err) {
+					store.commit('setNotification', {
+						color: 'error',
+						text: `Failed to delete tag ${from}`
+					});
+					return;
+				}
 			}
 
 			if (store.state.tagFilter === from) {

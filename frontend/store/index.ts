@@ -286,27 +286,41 @@ export const actions: ActionTree<RootState, RootState> = {
 
 	async deleteTasks(context, tasks: Task[]) {
 		const groups = groupByProfile(tasks);
-		for (const [profile, ts] of groups) {
-			const headers = profile ? { 'X-Profile': profile } : undefined;
-			await this.$axios.$delete('/api/tasks', {
-				params: { tasks: ts.map(task => task.uuid) },
-				headers
-			});
+		// Always refresh, even on failure — the multi-profile loop can partially
+		// succeed (one profile written, the next throws), and stale UI is worse
+		// than reflecting what actually happened. Swallow refresh errors so the
+		// original write error (which the caller wants to surface) isn't masked.
+		try {
+			for (const [profile, ts] of groups) {
+				const headers = profile ? { 'X-Profile': profile } : undefined;
+				await this.$axios.$delete('/api/tasks', {
+					params: { tasks: ts.map(task => task.uuid) },
+					headers
+				});
+			}
 		}
-		await context.dispatch('fetchTasks');
+		finally {
+			try { await context.dispatch('fetchTasks'); }
+			catch (err) { console.error('[store] fetchTasks after delete failed:', err); }
+		}
 	},
 
 	async updateTasks(context, tasks: Task[]) {
 		const groups = groupByProfile(tasks);
-		for (const [profile, ts] of groups) {
-			const headers = profile ? { 'X-Profile': profile } : undefined;
-			// Strip frontend-only annotations before sending — taskwarrior-lib
-			// persists unknown fields, so leaving _profile on the payload
-			// would create a stray UDA on every updated task.
-			const payload = ts.map(t => stripInternalFields(t));
-			await this.$axios.$put('/api/tasks', { tasks: payload }, { headers });
+		try {
+			for (const [profile, ts] of groups) {
+				const headers = profile ? { 'X-Profile': profile } : undefined;
+				// Strip frontend-only annotations before sending — taskwarrior-lib
+				// persists unknown fields, so leaving _profile on the payload
+				// would create a stray UDA on every updated task.
+				const payload = ts.map(t => stripInternalFields(t));
+				await this.$axios.$put('/api/tasks', { tasks: payload }, { headers });
+			}
 		}
-		await context.dispatch('fetchTasks');
+		finally {
+			try { await context.dispatch('fetchTasks'); }
+			catch (err) { console.error('[store] fetchTasks after update failed:', err); }
+		}
 	},
 
 	async syncTasks(context) {

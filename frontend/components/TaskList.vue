@@ -768,17 +768,31 @@ export default defineComponent({
 		};
 
 		const undoTasks = async (originals: Task[]) => {
-			await store.dispatch('updateTasks', originals);
+			try {
+				await store.dispatch('updateTasks', originals);
+			}
+			catch (err) {
+				store.commit('setNotification', { color: 'error', text: 'Failed to undo' });
+			}
 		};
 
 		const completeTasks = async (tasks: Task[]) => {
 			const originals = tasks.map(t => _.cloneDeep(t));
-			await store.dispatch('updateTasks', tasks.map(task => {
-				return {
-					...task,
-					status: 'completed'
-				};
-			}));
+			try {
+				await store.dispatch('updateTasks', tasks.map(task => {
+					return {
+						...task,
+						status: 'completed'
+					};
+				}));
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: tasks.length === 1 ? 'Failed to complete task' : `Failed to complete ${tasks.length} tasks`
+				});
+				return;
+			}
 			selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
 			store.commit('setNotification', {
 				color: 'success',
@@ -790,7 +804,16 @@ export default defineComponent({
 
 		const deleteTasks = async (tasks: Task[]) => {
 			const originals = tasks.map(t => _.cloneDeep(t));
-			await store.dispatch('deleteTasks', tasks);
+			try {
+				await store.dispatch('deleteTasks', tasks);
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: tasks.length === 1 ? 'Failed to delete task' : `Failed to delete ${tasks.length} tasks`
+				});
+				return;
+			}
 			selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
 			store.commit('setNotification', {
 				color: 'success',
@@ -813,7 +836,16 @@ export default defineComponent({
 				? 'Delete the entire recurring series? Existing instances stay but no new ones will be generated.'
 				: `Delete ${count} recurring series? Existing instances stay but no new ones will be generated.`;
 			confirmation.handler = async () => {
-				await store.dispatch('deleteTasks', parents);
+				try {
+					await store.dispatch('deleteTasks', parents);
+				}
+				catch (err) {
+					store.commit('setNotification', {
+						color: 'error',
+						text: count === 1 ? 'Failed to delete recurring series' : `Failed to delete ${count} recurring series`
+					});
+					return;
+				}
 				selected.value = selected.value.filter(task =>
 					!parents.some(p => p.uuid === task.uuid));
 				store.commit('setNotification', {
@@ -838,12 +870,21 @@ export default defineComponent({
 			confirmation.title = 'Confirm';
 			confirmation.text = 'Are you sure to restore the task(s)?';
 			confirmation.handler = async () => {
-				await store.dispatch('updateTasks', tasks.map(task => {
-					return {
-						...task,
-						status: 'pending'
-					};
-				}));
+				try {
+					await store.dispatch('updateTasks', tasks.map(task => {
+						return {
+							...task,
+							status: 'pending'
+						};
+					}));
+				}
+				catch (err) {
+					store.commit('setNotification', {
+						color: 'error',
+						text: tasks.length === 1 ? 'Failed to restore task' : `Failed to restore ${tasks.length} tasks`
+					});
+					return;
+				}
 				selected.value = selected.value.filter(task => tasks.findIndex(t => t.uuid === task.uuid) === -1);
 				store.commit('setNotification', {
 					color: 'success',
