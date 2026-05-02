@@ -26,10 +26,8 @@
 	--tw-warning-soft: rgba(217, 119, 6, 0.1);
 	--tw-success: #059669;
 	--tw-success-soft: rgba(5, 150, 105, 0.1);
-	--tw-success-armed: rgba(5, 150, 105, 0.22);
 	--tw-info: #2563EB;
 	--tw-info-soft: rgba(37, 99, 235, 0.1);
-	--tw-danger-armed: rgba(220, 38, 38, 0.22);
 
 	/* Status colors — one per tab */
 	--tw-st-today: #EA580C;
@@ -70,12 +68,10 @@
 
 	--tw-danger: #F87171;
 	--tw-danger-soft: rgba(248, 113, 113, 0.12);
-	--tw-danger-armed: rgba(248, 113, 113, 0.28);
 	--tw-warning: #FBBF24;
 	--tw-warning-soft: rgba(251, 191, 36, 0.12);
 	--tw-success: #34D399;
 	--tw-success-soft: rgba(52, 211, 153, 0.12);
-	--tw-success-armed: rgba(52, 211, 153, 0.28);
 	--tw-info: #60A5FA;
 	--tw-info-soft: rgba(96, 165, 250, 0.12);
 
@@ -123,9 +119,6 @@ button,
 	-webkit-tap-highlight-color: transparent;
 }
 
-/* Rows aren't in the list above on purpose: `manipulation` lets the browser
-   claim horizontal pans for itself, which kills the swipe-to-complete /
-   swipe-to-delete gesture. Tap-highlight removal still applies. */
 .v-data-table tbody tr {
 	-webkit-tap-highlight-color: transparent;
 }
@@ -1655,8 +1648,8 @@ button.tw-icon-btn:focus-visible {
 }
 
 /* Complete-circle button (Todoist-style) */
-.v-application .tw-th--compact { padding: 0 8px !important; width: 36px !important; }
-.v-application .tw-td--compact { padding: 0 8px !important; width: 36px !important; }
+.v-application .tw-table thead th.tw-th--compact { padding: 0 8px !important; width: 36px !important; }
+.v-application .tw-table tbody td.tw-td--compact { padding: 0 8px !important; width: 36px !important; }
 
 .tw-complete {
 	appearance: none;
@@ -1914,70 +1907,6 @@ button.tw-icon-btn:focus-visible {
 	*, *::before, *::after {
 		animation-duration: 0.01ms !important;
 		transition-duration: 0.01ms !important;
-	}
-}
-
-/* Swipe gestures — only relevant on touch screens, but the styles are
-   triggered by JS class toggles so we keep them outside the media query. */
-.v-application .tw-table tbody tr.tw-row--swipe-right > td,
-.v-application .tw-table tbody tr.tw-row--swipe-left > td {
-	transition: background-color 120ms ease;
-}
-
-.v-application .tw-table tbody tr.tw-row--swipe-right > td {
-	background: var(--tw-success-soft) !important;
-}
-.v-application .tw-table tbody tr.tw-row--swipe-left > td {
-	background: var(--tw-danger-soft) !important;
-}
-.v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-right > td {
-	background: var(--tw-success-armed) !important;
-}
-.v-application .tw-table tbody tr.tw-row--swipe-armed.tw-row--swipe-left > td {
-	background: var(--tw-danger-armed) !important;
-}
-
-/* Reveal an action icon on the leading edge of the swiped row. */
-.v-application .tw-table tbody tr.tw-row--swipe-right,
-.v-application .tw-table tbody tr.tw-row--swipe-left {
-	position: relative;
-}
-
-.v-application .tw-table tbody tr.tw-row--swipe-right::before,
-.v-application .tw-table tbody tr.tw-row--swipe-left::before {
-	display: inline-block;
-	font: normal normal normal 22px/1 'Material Design Icons';
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	position: absolute;
-	top: 50%;
-	transform: translateY(-50%);
-	pointer-events: none;
-	z-index: 1;
-}
-
-.v-application .tw-table tbody tr.tw-row--swipe-right::before {
-	content: '\F05E0'; /* mdi-check-circle */
-	left: 16px;
-	color: var(--tw-success);
-}
-
-.v-application .tw-table tbody tr.tw-row--swipe-left::before {
-	content: '\F09E7'; /* mdi-delete-outline */
-	right: 16px;
-	color: var(--tw-danger);
-}
-
-/* Allow vertical scroll while we capture horizontal pans for swipe.
-   Has to be set on .v-data-table__wrapper specifically: Vuetify gives that
-   element `overflow-x: auto`, which makes the browser claim pan-x for its
-   own horizontal scrolling regardless of an ancestor's touch-action. The
-   wrapper's own touch-action wins, so set pan-y there. We also keep it on
-   .tw-table-wrap as a belt-and-braces in case the wrapper class changes. */
-@media (hover: none) {
-	.v-application .tw-table-wrap,
-	.v-application .tw-table .v-data-table__wrapper {
-		touch-action: pan-y;
 	}
 }
 
@@ -2348,12 +2277,13 @@ button.tw-icon-btn:focus-visible {
 
 	/* Pull the description tight against the complete circle — on a phone
 	   the default desktop gutter wastes horizontal space and pushes the
-	   text uncomfortably far from the tap target. */
+	   text uncomfortably far from the tap target. The button itself is the
+	   36px tap zone, so the cell keeps no horizontal padding. */
 	.v-application .tw-table tbody td.tw-td--compact {
-		padding-right: 4px !important;
+		padding: 0 0 0 8px !important;
 	}
 	.v-application .tw-table tbody td.tw-td--compact + td {
-		padding-left: 4px !important;
+		padding-left: 6px !important;
 	}
 
 	/* Compact actions on phone: only the delete icon stays */

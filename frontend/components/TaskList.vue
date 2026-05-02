@@ -210,7 +210,6 @@
 				class="tw-table"
 				style="width: 100%"
 				@click:row="onRowClick"
-				@pointerdown.native="onSwipeStart"
 			>
 				<template v-slot:group.header="{ group, items, isOpen, toggle, headers: hdrs }">
 					<tr class="v-row-group__header tw-group-row">
@@ -247,7 +246,6 @@
 					<span
 						class="tw-description tw-description--clickable"
 						title="Edit task"
-						:data-task-uuid="item.uuid"
 						@click="onDescriptionClick($event, item)"
 					>
 						<span v-html="linkify(item.description)" />
@@ -1020,165 +1018,9 @@ export default defineComponent({
 			}
 		};
 
-		// ── Swipe gestures (mobile) ──────────────────────────────────────────
-		// Swipe right → complete (or restore); swipe left → delete (or stop
-		// recurring series). Only fires on touch/pen pointers; mouse keeps
-		// using the existing buttons.
-		const SWIPE_DIRECTION_LOCK = 8;
-		const SWIPE_TRANSLATE_CAP = 100;
-		const SWIPE_ACTION_THRESHOLD = 80;
-		const SWIPE_SNAP_MS = 180;
-		const SWIPE_CLEANUP_MS = SWIPE_SNAP_MS + 40;
-		const SWIPE_CLICK_SUPPRESS_MS = 150;
-
-		type SwipeState = {
-			tr: HTMLElement;
-			uuid: string;
-			pointerId: number;
-			startX: number;
-			startY: number;
-			direction: 'h' | 'v' | null;
-			lastTransform: string;
-			lastSide: 'right' | 'left' | null;
-			lastArmed: boolean;
-		};
-		let swipeState: SwipeState | null = null;
-		let swipeCleanupTimer: number | null = null;
-
-		const swipeCleanup = (tr: HTMLElement) => {
-			tr.style.transform = '';
-			tr.style.transition = '';
-			tr.classList.remove('tw-row--swipe-right', 'tw-row--swipe-left', 'tw-row--swipe-armed');
-		};
-
-		const detachSwipeListeners = () => {
-			window.removeEventListener('pointermove', onSwipeMove);
-			window.removeEventListener('pointerup', onSwipeEnd);
-			window.removeEventListener('pointercancel', onSwipeCancel);
-		};
-
-		const onSwipeStart = (e: PointerEvent) => {
-			if (!isMobile.value) return;
-			if (e.pointerType === 'mouse') return;
-			if (swipeState) return;
-			const target = e.target as HTMLElement | null;
-			if (!target) return;
-			if (target.closest('button, a, .v-data-footer, thead')) return;
-			const tr = target.closest('tr') as HTMLElement | null;
-			if (!tr || tr.classList.contains('v-row-group__header')) return;
-			const uuid = tr.querySelector<HTMLElement>('[data-task-uuid]')?.dataset.taskUuid;
-			if (!uuid) return;
-			// Cancel any in-flight snap-back animation so the new gesture doesn't
-			// inherit a transition and animate to the finger position.
-			if (swipeCleanupTimer !== null) {
-				window.clearTimeout(swipeCleanupTimer);
-				swipeCleanupTimer = null;
-			}
-			swipeCleanup(tr);
-			swipeState = {
-				tr,
-				uuid,
-				pointerId: e.pointerId,
-				startX: e.clientX,
-				startY: e.clientY,
-				direction: null,
-				lastTransform: '',
-				lastSide: null,
-				lastArmed: false
-			};
-			window.addEventListener('pointermove', onSwipeMove);
-			window.addEventListener('pointerup', onSwipeEnd);
-			window.addEventListener('pointercancel', onSwipeCancel);
-		};
-
-		function onSwipeMove(e: PointerEvent) {
-			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
-			const dx = e.clientX - swipeState.startX;
-			const dy = e.clientY - swipeState.startY;
-			if (swipeState.direction === null) {
-				if (Math.abs(dx) <= SWIPE_DIRECTION_LOCK && Math.abs(dy) <= SWIPE_DIRECTION_LOCK) return;
-				if (Math.abs(dy) > Math.abs(dx)) {
-					swipeState = null;
-					detachSwipeListeners();
-					return;
-				}
-				swipeState.direction = 'h';
-			}
-			const s = swipeState;
-			const capped = Math.max(-SWIPE_TRANSLATE_CAP, Math.min(SWIPE_TRANSLATE_CAP, dx));
-			const transform = `translateX(${capped}px)`;
-			if (transform !== s.lastTransform) {
-				s.tr.style.transform = transform;
-				s.lastTransform = transform;
-			}
-			const side = dx > 0 ? 'right' : 'left';
-			if (side !== s.lastSide) {
-				s.tr.classList.toggle('tw-row--swipe-right', side === 'right');
-				s.tr.classList.toggle('tw-row--swipe-left', side === 'left');
-				s.lastSide = side;
-			}
-			const armed = Math.abs(dx) > SWIPE_ACTION_THRESHOLD;
-			if (armed !== s.lastArmed) {
-				s.tr.classList.toggle('tw-row--swipe-armed', armed);
-				s.lastArmed = armed;
-			}
-		}
-
-		function onSwipeEnd(e: PointerEvent) {
-			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
-			const s = swipeState;
-			swipeState = null;
-			detachSwipeListeners();
-
-			const dx = e.clientX - s.startX;
-			const horizontal = s.direction === 'h';
-			const armed = horizontal && Math.abs(dx) >= SWIPE_ACTION_THRESHOLD;
-
-			s.tr.style.transition = `transform ${SWIPE_SNAP_MS}ms ease`;
-			s.tr.style.transform = '';
-			if (swipeCleanupTimer !== null) window.clearTimeout(swipeCleanupTimer);
-			swipeCleanupTimer = window.setTimeout(() => {
-				swipeCleanup(s.tr);
-				swipeCleanupTimer = null;
-			}, SWIPE_CLEANUP_MS);
-
-			// Suppress the synthetic click that follows pointerup after a real
-			// horizontal swipe — otherwise the description's @click would re-open
-			// the edit dialog after every successful swipe.
-			if (horizontal && Math.abs(dx) > SWIPE_DIRECTION_LOCK) {
-				const suppress = (ev: MouseEvent) => {
-					ev.stopPropagation();
-					ev.preventDefault();
-				};
-				window.addEventListener('click', suppress, { capture: true, once: true });
-				window.setTimeout(() => {
-					window.removeEventListener('click', suppress, true);
-				}, SWIPE_CLICK_SUPPRESS_MS);
-			}
-
-			if (!armed) return;
-			const item = currentItems.value.find(i => i.uuid === s.uuid);
-			if (!item) return;
-			if (dx > 0) togglePending(item);
-			else onRowDelete(item);
-		}
-
-		function onSwipeCancel(e: PointerEvent) {
-			if (!swipeState || e.pointerId !== swipeState.pointerId) return;
-			const tr = swipeState.tr;
-			swipeState = null;
-			detachSwipeListeners();
-			swipeCleanup(tr);
-			if (swipeCleanupTimer !== null) {
-				window.clearTimeout(swipeCleanupTimer);
-				swipeCleanupTimer = null;
-			}
-		}
-
 		onMounted(() => window.addEventListener('keydown', onGridKeydown));
 		onBeforeUnmount(() => {
 			window.removeEventListener('keydown', onGridKeydown);
-			detachSwipeListeners();
 		});
 
 		const tabCount = (st: string): number => classifiedTasks.value[st]?.length ?? 0;
@@ -1244,7 +1086,6 @@ export default defineComponent({
 			setTodayScope,
 			showTodayScopeToggle,
 			isMobile,
-			onSwipeStart,
 
 			ConfirmationDialog,
 			ColumnDialog
