@@ -1,9 +1,11 @@
 import * as Router from '@koa/router';
+import { withProfileLock } from './queue';
 
 const router = new Router();
 
 router.post('/', async ctx => {
-	const msg = ctx.state.taskwarrior.executeCommand('sync');
+	const profile: string = ctx.state.profileName;
+	const msg = await withProfileLock(profile, () => ctx.state.taskwarrior.executeCommand('sync'));
 	console.log(msg);
 	ctx.status = 200;
 });

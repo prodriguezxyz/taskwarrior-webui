@@ -54,6 +54,7 @@ app.use(async (ctx, next) => {
 		name = allowed[0];
 	}
 	ctx.state.taskwarrior = getProfile(name);
+	ctx.state.profileName = name;
 	await next();
 });
 
