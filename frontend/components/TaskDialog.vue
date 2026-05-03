@@ -7,7 +7,19 @@
 	>
 		<v-card>
 			<v-card-title>
-				{{ task ? 'Edit Task' : 'New Task' }}
+				<span>{{ task ? 'Edit Task' : 'New Task' }}</span>
+				<v-spacer />
+				<v-btn
+					v-if="parentTemplate"
+					text
+					small
+					class="text-none tw-edit-series"
+					title="Open the recurring template that generated this instance"
+					@click="editParent"
+				>
+					<v-icon left small>mdi-restart</v-icon>
+					Edit series
+				</v-btn>
 			</v-card-title>
 			<v-card-text>
 				<v-form ref="formRef" lazy-validation>
@@ -221,6 +233,26 @@ export default defineComponent({
 			set: val => ctx.emit('input', val)
 		});
 
+		// Surfaced when editing a recurring child instance: lets the user jump to
+		// the parent template (status='recurring') without leaving Today view to
+		// hunt for it in the Recurring filter. Profile-scoped so a child never
+		// resolves to a parent UUID that lives in another profile.
+		const parentTemplate = computed(() => {
+			const t = props.task as TaskWithProfile | undefined;
+			const parentUuid = (t as any)?.parent as string | undefined;
+			if (!parentUuid) return null;
+			const profile = t?._profile;
+			return store.state.tasks.find(p =>
+				p.uuid === parentUuid
+				&& (!store.getters.multiProfile || (p as TaskWithProfile)._profile === profile)
+			) || null;
+		});
+
+		const editParent = () => {
+			if (!parentTemplate.value) return;
+			store.commit('openEditTaskDialog', JSON.parse(JSON.stringify(parentTemplate.value)));
+		};
+
 		const requiredRules = [
 			(str: string) => Boolean(str) || 'Required'
 		];
@@ -378,8 +410,21 @@ export default defineComponent({
 			projectComboRef,
 			onProjectEnter,
 			tagsSearch,
-			onTagsEnter
+			onTagsEnter,
+			parentTemplate,
+			editParent
 		};
 	}
 });
 </script>
+
+<style scoped>
+.tw-edit-series {
+	letter-spacing: normal;
+	font-size: 13px;
+	opacity: 0.85;
+}
+.tw-edit-series:hover {
+	opacity: 1;
+}
+</style>

@@ -236,11 +236,14 @@
 							class="tw-profile-chip"
 							:title="`Profile: ${item._profile}`"
 						>{{ item._profile }}</span>
-						<span
+						<button
 							v-if="item._collapsedCount > 0"
-							class="tw-overdue-chip"
-							:title="`${item._collapsedCount} more pending instance${item._collapsedCount === 1 ? '' : 's'} in this recurring series`"
-						>+{{ item._collapsedCount }}</span>
+							type="button"
+							class="tw-overdue-chip tw-overdue-chip--button"
+							:title="`Edit series · ${item._collapsedCount} more pending instance${item._collapsedCount === 1 ? '' : 's'}`"
+							aria-label="Edit recurring series"
+							@click="onActionClick($event, () => editParentTemplate(item))"
+						>+{{ item._collapsedCount }}</button>
 					</span>
 					<div v-if="isMobile" class="tw-description__sub">
 						<span v-if="item.project" class="tw-description__sub-meta">
@@ -711,6 +714,27 @@ export default defineComponent({
 			store.commit('openEditTaskDialog', _.cloneDeep(task));
 		};
 
+		// Open the recurring template (status='recurring') for an instance whose
+		// parent UUID is set. Profile-scoped to avoid resolving to a same-UUID
+		// parent in another profile (cross-device sync to the same taskserver).
+		const editParentTemplate = (item: Task) => {
+			const parentUuid = (item as any).parent as string | undefined;
+			if (!parentUuid) return;
+			const profile = (item as any)._profile;
+			const parent = store.state.tasks.find(t =>
+				t.uuid === parentUuid
+				&& (!store.getters.multiProfile || (t as any)._profile === profile)
+			);
+			if (!parent) {
+				store.commit('setNotification', {
+					color: 'warning',
+					text: 'Recurring template not found'
+				});
+				return;
+			}
+			store.commit('openEditTaskDialog', _.cloneDeep(parent));
+		};
+
 		const toggleSelection = (task: Task) => {
 			const idx = selected.value.findIndex(t => t.uuid === task.uuid);
 			if (idx >= 0) selected.value = selected.value.filter(t => t.uuid !== task.uuid);
@@ -1072,6 +1096,7 @@ export default defineComponent({
 			showSyncBtn,
 			syncTasks,
 			editTask,
+			editParentTemplate,
 			onDescriptionClick,
 			onRowClick,
 			onActionClick,
@@ -1158,5 +1183,17 @@ export default defineComponent({
 	vertical-align: middle;
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
+}
+.tw-overdue-chip--button {
+	cursor: pointer;
+	font-family: inherit;
+	transition: border-color 0.12s ease, color 0.12s ease, background-color 0.12s ease;
+}
+.tw-overdue-chip--button:hover,
+.tw-overdue-chip--button:focus-visible {
+	border-color: rgba(127, 127, 127, 0.7);
+	color: rgba(127, 127, 127, 1);
+	background: rgba(127, 127, 127, 0.08);
+	outline: none;
 }
 </style>
