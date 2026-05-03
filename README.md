@@ -1,92 +1,95 @@
-# Taskwarrior-webui
+# Taskwarrior-webui (personal fork)
 
-[![Docker Image Size](https://badgen.net/docker/size/dcsunset/taskwarrior-webui)](https://hub.docker.com/r/dcsunset/taskwarrior-webui)
+Personal fork of [DCsunset/taskwarrior-webui](https://github.com/DCsunset/taskwarrior-webui). Upstream has been effectively inactive since late 2024, so this fork is where new features and fixes live. The original stack — Vue.js (Nuxt 2 + Vuetify) frontend, Koa.js backend wrapping the `task` CLI — is preserved.
 
-Responsive Web UI for Taskwarrior based on Vue.js and Koa.js.
+## About this fork
+
+This fork is maintained primarily for personal use. Compared to upstream it adds:
+
+- A redesigned UI (minimal, Linear/Todoist-inspired) replacing the Material Design defaults.
+- A "Today" tab combining due-today and overdue tasks, with collapsible recurring instances.
+- An Inbox view (pending tasks with no project and no parent — strict GTD).
+- Multi-profile support: switch between several `.taskrc` / `.task` pairs from the UI.
+- Per-user authentication via Cloudflare Access, with per-profile authorization.
+- Client-side text search with `/` and `Ctrl+K` shortcuts.
+- Mobile-friendly tweaks: denser rows and a quick-add FAB.
+- Reusable date/time picker for `Due` / `Until` / `Scheduled` / `Wait` fields.
+- Backend write serialization per profile to prevent data corruption under concurrent edits.
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for the detailed feature inventory with commit SHAs.
 
 ## Screenshots
 
-![Screenshot 1](./screenshots/Screenshot1.png)
+![Today view — light theme](./screenshots/today-light.png)
 
-![Screenshot 2](./screenshots/Screenshot2.png)
+![Today view — dark theme](./screenshots/today-dark.png)
 
 ## Features
 
-* Responsive layouts
-* Material Design UI
-* PWA support
-* Easy to deploy (using Docker)
-* Support for multiple types of tasks
-* Support for light and dark themes
-* Sync with a taskserver
-
+- Responsive layouts and PWA support
+- Light and dark themes
+- Sync with a Taskserver / Taskchampion server
+- Multi-profile sync targets
+- Optional Cloudflare Access authentication
+- Easy to deploy (single Docker image)
 
 ## Deployment
 
-### Using docker (recommended)
+This fork is deployed by building the image locally and streaming it to a VPS over SSH (`docker save | ssh ... docker load`), then `docker compose up -d`. There is no public registry in the loop — the upstream's CI workflow publishes to its own Docker Hub namespace and is not used here.
 
-First pull the docker image:
-(Note that taskwarrior v2 and v3 are not compatible with each other.
-Choose based on your current data version.)
+A helper script `deploy.sh` automates build + transfer + restart. See [`DEPLOY.md`](./DEPLOY.md) for the full setup, including Cloudflare Access configuration, the per-user `users.json` mapping, rollback and image hygiene.
+
+If you just want to run it locally without the SSH/VPS flow, the simplest path is:
+
 ```sh
-# For taskwarrior 3
-docker pull dcsunset/taskwarrior-webui:3
-# For taskwarrior 2
-docker pull dcsunset/taskwarrior-webui
-```
-
-Then run it with the command:
-```sh
+docker build -t taskwarrior-webui .
 docker run -d -p 8080:80 --name taskwarrior-webui \
-	-v $HOME/.taskrc:/.taskrc -v $HOME/.task:/.task \
-	dcsunset/taskwarrior-webui:3
+    -v $HOME/.taskrc:/.taskrc -v $HOME/.task:/.task \
+    taskwarrior-webui
 ```
 
-Finally, open `http://127.0.0.1:8080` with your browser (replace `127.0.0.1` with your ip address if running on a remote server).
+Then open `http://127.0.0.1:8080`.
 
-If you want to use already existing taskwarrior data in another container, use `:z` or `:Z` labels. See
-[here](https://stackoverflow.com/questions/35218194/what-is-z-flag-in-docker-containers-volumes-from-option/35222815#35222815).
-```
-# e.g.
-docker run -d -p 8080:80 --name taskwarrior-webui \
-	-v $HOME/.taskrc:/.taskrc:z -v $HOME/.task:/.task:z \
-	dcsunset/taskwarrior-webui
-```
+> Taskwarrior v2 and v3 data files are **not** cross-compatible. The Dockerfile pulls `task3` from Alpine `edge/community`, so the resulting image is v3-only.
 
-If your configuration file contains absolute path to your home directory like `/home/xxx/ca.cert.pem`,
-you may want to mount files to the same paths in the container using the following command:
+If your `.taskrc` references absolute paths (e.g. `/home/you/ca.cert.pem` for taskserver certs), mount the files at the same paths inside the container and set `TASKRC` / `TASKDATA` accordingly:
 
 ```sh
 docker run -d -p 8080:80 --name taskwarrior-webui \
-	-e TASKRC=$HOME/.taskrc -e TASKDATA=$HOME/.task \
-	-v $HOME/.taskrc:$HOME/.taskrc -v $HOME/.task:$HOME/.task \
-	dcsunset/taskwarrior-webui
+    -e TASKRC=$HOME/.taskrc -e TASKDATA=$HOME/.task \
+    -v $HOME/.taskrc:$HOME/.taskrc -v $HOME/.task:$HOME/.task \
+    taskwarrior-webui
 ```
 
-## Configurations
+## Configuration
 
-The following environment variables may be set:
- * `TASKRC` - the location of the `.taskrc` file, `/.taskrc` by default when run in _production_ mode
- * `TASKDATA` - the location of the `.task` directory, `/.task` by default when run in _production_ mode
- * `PROFILES_CONFIG` - path to a JSON file declaring multiple task datasets (see below), `/profiles.json` by default
+Environment variables read by the backend:
 
-Remember to mount your files to **the corresponding locations** when you set `TASKRC` or `TASKDATA` to a different value.
+| Variable | Default | Purpose |
+|---|---|---|
+| `TASKRC` | `/.taskrc` | Path to the `.taskrc` file |
+| `TASKDATA` | `/.task` | Path to the `.task` data directory |
+| `PROFILES_CONFIG` | `/profiles.json` | Optional JSON file declaring multiple profiles |
+| `USERS_CONFIG` | `/users.json` | Maps authenticated emails to allowed profiles (Cloudflare Access mode) |
+| `AUTH_MODE` | `cloudflare` | `cloudflare` (verify JWT) or `dev` (bypass; local only) |
+| `CF_ACCESS_TEAM_DOMAIN` | — | Required when `AUTH_MODE=cloudflare` |
+| `CF_ACCESS_AUD` | — | Required when `AUTH_MODE=cloudflare` |
+| `DEV_USER_EMAIL` | `dev@localhost` | Email injected as the request user in `dev` mode |
+
+When `TASKRC` or `TASKDATA` is changed, mount the files at the matching paths inside the container.
 
 ### Multiple profiles
 
-To switch between several `.taskrc`/`.task` pairs from the UI, mount a JSON file
-with one entry per profile:
+Mount a JSON file declaring one entry per profile:
 
 ```json
 {
   "profiles": [
-    { "name": "Personal", "taskrc": "/profiles/personal/.taskrc", "taskdata": "/profiles/personal/.task" },
-    { "name": "Work",     "taskrc": "/profiles/work/.taskrc",     "taskdata": "/profiles/work/.task" }
+    { "name": "personal", "taskrc": "/profiles/personal/.taskrc", "taskdata": "/profiles/personal/.task" },
+    { "name": "work",     "taskrc": "/profiles/work/.taskrc",     "taskdata": "/profiles/work/.task" }
   ]
 }
 ```
-
-Then mount the file and the referenced data directories into the container:
 
 ```sh
 docker run -d -p 8080:80 --name taskwarrior-webui \
@@ -95,109 +98,68 @@ docker run -d -p 8080:80 --name taskwarrior-webui \
     -v $HOME/.task:/profiles/personal/.task \
     -v $PWD/work/.taskrc:/profiles/work/.taskrc \
     -v $PWD/work/.task:/profiles/work/.task \
-    dcsunset/taskwarrior-webui:3
+    taskwarrior-webui
 ```
 
-A profile selector appears in the top bar whenever two or more profiles are
-defined. If `PROFILES_CONFIG` points to a missing file, the UI falls back to a
-single default profile using `TASKRC` and `TASKDATA` — so existing deployments
-keep working without changes.
+A profile selector appears in the top bar whenever two or more profiles are defined. If `PROFILES_CONFIG` points to a missing file, the UI falls back to a single default profile using `TASKRC` and `TASKDATA`.
 
-### Manually deploy
+### Authentication
 
-First build the frontend:
+Two modes:
 
-```
+- **`AUTH_MODE=cloudflare`** (default in production): every request must carry a valid `Cf-Access-Jwt-Assertion` header. Configure a Cloudflare Access self-hosted application in front of the deployment, then provide `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD`. Authenticated emails are mapped to allowed profiles via `users.json`. Full walkthrough in [`DEPLOY.md`](./DEPLOY.md).
+- **`AUTH_MODE=dev`**: skips JWT verification and treats every request as authenticated as `DEV_USER_EMAIL`. Used by the dev npm scripts (`npm run dev`). Do not use in production.
+
+If you don't want Cloudflare Access, you can keep `AUTH_MODE=cloudflare` disabled by replacing the auth layer with another reverse proxy (basic-auth via nginx, mTLS, etc.) — but `users.json`-based per-user profile authorization assumes the email claim from Cloudflare Access. Without it, all requests run under the dev user.
+
+### Manual build (no Docker)
+
+Frontend:
+
+```sh
 cd frontend
 npm install
 npm run build
-npm run export
+npm run export   # generates frontend/dist (static)
 ```
 
-Then build and start the backend:
+Backend:
 
-```
+```sh
 cd backend
 npm install
 npm run build
 npm start
 ```
 
-Then install nginx or other web servers
-to server frontend and proxy requests to backend
-(you can refer to `nginx/nginx.conf`).
+Then serve the frontend with nginx (or another web server) and reverse-proxy `/api/` to the backend (`backend/src/app.ts` listens on port 3000). Reference config: `nginx/server.conf`.
 
 ## Development
 
-First start the server at backend:
+Two shells:
 
-```
-cd backend
-npm install
-npm run dev
-```
+```sh
+# Backend — listens on localhost:3000, uses backend/test/.taskrc and backend/test/.task
+cd backend && npm install && npm run dev
 
-Then start the dev server at frontend:
-
-```
-cd frontend
-npm install
-npm run dev
+# Frontend — Nuxt dev server on localhost:8080, proxies /api → localhost:3000
+cd frontend && npm install && npm run dev
 ```
 
-Then the frontend will listen at port 8080.
+Open `http://localhost:8080`. The dev `TASKRC` / `TASKDATA` point into `backend/test/`, so local development does not touch your real Taskwarrior data. The backend `npm run dev` script sets `AUTH_MODE=dev`, so requests don't need a JWT during local development.
 
-## Contributing
+Node version is pinned at **16.17.1** (`.tool-versions`). The frontend requires `NODE_OPTIONS=--openssl-legacy-provider` (already baked into its npm scripts) because of Nuxt 2 / Webpack 4 crypto compatibility on newer Node releases.
 
-Contributions are very welcome!
-Please create or comment on an issue to discuss your ideas first before working on any PR.
+Frontend lint:
 
-I've been very busy recently and may not be able to handle every issue timely.
-So I'm also looking for maintainers who are interested in this project.
-Feel free to open an issue if you have any interest.
-
-## FAQ
-
-### Sync with a taskserver
-
-This Web UI supports auto sync with a taskd server
-by calling the `task sync` command periodically.
-In order to use this function,
-first you need to follow the [instructions](https://taskwarrior.org/docs/taskserver/setup.html)
-to configure both the taskserver and client manually until the `task sync` can be executed successfully.
-Then remember to map the client configurations (`.taskrc` and `.task`) into the container.
-
-### Authentication
-
-Though authentication is not supported directly,
-it is possible to use basic auth by configuring nginx (or you can even use your own reverse-proxy to do it).
-
-For example, you can modify the file `nginx/server.conf` as below:
-
-```nginx
-server {
-  listen 80;
-  listen [::]:80;
-
-  # add auth
-  auth_basic           "Protected page";
-  auth_basic_user_file /etc/htpasswd;
-
-  # remaining part unchanged
-  ...
-}
+```sh
+cd frontend && npm run lint   # eslint --fix on .ts/.js/.vue
 ```
 
-Then mount the file and `htpasswd` file:
+## Sync with a Taskserver
 
-```shell
-docker run -d -p 8080:80 --name taskwarrior-webui \
-	-v $HOME/.taskrc:/.taskrc -v $HOME/.task:/.task \
-    -v $PWD/server.conf:/etc/nginx/conf.d/default.conf \
-    -v $PWD/htpasswd:/etc/htpasswd \
-	dcsunset/taskwarrior-webui
-```
+This Web UI supports auto-sync by calling `task sync` periodically. To use it, configure both the taskserver and client manually until `task sync` runs successfully on the host, then map the resulting `.taskrc` and `.task` into the container.
 
 ## License
 
-GPL-3.0 License
+GPL-3.0

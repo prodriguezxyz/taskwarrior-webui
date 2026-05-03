@@ -22,12 +22,12 @@ The backend rejects every request that does not carry a valid `Cf-Access-Jwt-Ass
 4. Policy: `Allow` with the list of emails permitted to use the app.
 5. After saving, copy:
    - **Application Audience (AUD) Tag** → `CF_ACCESS_AUD`
-   - **Team domain** (e.g. `pedro.cloudflareaccess.com`) → `CF_ACCESS_TEAM_DOMAIN`
+   - **Team domain** (e.g. `<your-team>.cloudflareaccess.com`) → `CF_ACCESS_TEAM_DOMAIN`
 6. On the VPS, in the `.env` next to `docker-compose.yml`:
 
    ```
    AUTH_MODE=cloudflare
-   CF_ACCESS_TEAM_DOMAIN=pedro.cloudflareaccess.com
+   CF_ACCESS_TEAM_DOMAIN=<your-team>.cloudflareaccess.com
    CF_ACCESS_AUD=<paste-aud-tag>
    ```
 
@@ -42,7 +42,7 @@ The backend rejects every request that does not carry a valid `Cf-Access-Jwt-Ass
 
 The container fails to start if `AUTH_MODE=cloudflare` and either env var is missing.
 
-For local development (`npm run dev`), set `AUTH_MODE=dev` to bypass Cloudflare; see `CLAUDE.md`.
+For local development (`npm run dev`), set `AUTH_MODE=dev` to bypass Cloudflare. The dev mode populates the request user from `DEV_USER_EMAIL` (default `dev@localhost`).
 
 ### Session duration (how often re-auth is required)
 
