@@ -5,3 +5,9 @@ dist
 # deploy
 .deploy.env
 tw.tar.gz
+
+# todoist migration (one-shot)
+.todoist-token
+*-import.json
+todoist-dump.json
+todoist-fresh.json
