@@ -209,6 +209,7 @@
 				class="tw-table"
 				style="width: 100%"
 				@click:row="onRowClick"
+				@contextmenu.native="onRowContextMenu"
 			>
 				<template v-slot:item._complete="{ item }">
 					<button
@@ -227,6 +228,7 @@
 				<template v-slot:item.description="{ item }">
 					<span
 						class="tw-description tw-description--clickable"
+						:data-row-uuid="item.uuid"
 						title="Edit task"
 						@click="onDescriptionClick($event, item)"
 					>
@@ -276,7 +278,12 @@
 					{{ displayDate(item.scheduled) }}
 				</template>
 				<template v-slot:item.due="{ item }">
-					{{ displayDate(item.due) }}
+					<span
+						class="tw-due-cell"
+						:class="{ 'tw-due-cell--clickable': isReschedulable(item) }"
+						:title="isReschedulable(item) ? 'Click to reschedule' : ''"
+						@click="onDueCellClick($event, item)"
+					>{{ displayDate(item.due) || (isReschedulable(item) ? '—' : '') }}</span>
 				</template>
 				<template v-slot:item.until="{ item }">
 					{{ displayDate(item.until) }}
@@ -338,6 +345,23 @@
 					</button>
 				</template>
 			</v-data-table>
+
+			<ReschedulePopover
+				v-model="reschedule.open"
+				:task="reschedule.task"
+				:position-x="reschedule.x"
+				:position-y="reschedule.y"
+				@apply="onApplyReschedule"
+			/>
+			<RowContextMenu
+				v-model="ctxMenu.open"
+				:task="ctxMenu.task"
+				:position-x="ctxMenu.x"
+				:position-y="ctxMenu.y"
+				@reschedule="onCtxReschedule"
+				@complete="togglePending"
+				@delete="onRowDelete"
+			/>
 		</div>
 	</div>
 </template>
@@ -348,6 +372,8 @@ import { Task } from 'taskwarrior-lib';
 import _ from 'lodash';
 import ConfirmationDialog from '../components/ConfirmationDialog.vue';
 import ColumnDialog from '../components/ColumnDialog.vue';
+import ReschedulePopover from '../components/ReschedulePopover.vue';
+import RowContextMenu from '../components/RowContextMenu.vue';
 import moment from 'moment';
 import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
@@ -770,6 +796,101 @@ export default defineComponent({
 			else if (task.status === 'completed' || task.status === 'deleted') restoreTasks([task]);
 		};
 
+		const reschedule = reactive({
+			open: false,
+			task: null as Task | null,
+			x: 0,
+			y: 0
+		});
+		const ctxMenu = reactive({
+			open: false,
+			task: null as Task | null,
+			x: 0,
+			y: 0
+		});
+
+		const isReschedulable = (task: Task | null | undefined) => {
+			if (!task) return false;
+			return task.status !== 'recurring'
+				&& task.status !== 'deleted'
+				&& task.status !== 'completed';
+		};
+
+		const openReschedulePopover = (
+			task: Task | null,
+			anchor: { x: number; y: number } | HTMLElement | null
+		) => {
+			if (reschedule.open) return;
+			if (!task || !task.uuid) return;
+			if (!isReschedulable(task)) return;
+			reschedule.task = task;
+			if (anchor instanceof HTMLElement) {
+				const rect = anchor.getBoundingClientRect();
+				reschedule.x = rect.left + 24;
+				reschedule.y = rect.bottom + 4;
+			}
+			else if (anchor && 'x' in anchor) {
+				reschedule.x = anchor.x;
+				reschedule.y = anchor.y;
+			}
+			else {
+				reschedule.x = window.innerWidth / 2 - 140;
+				reschedule.y = 120;
+			}
+			reschedule.open = true;
+		};
+
+		const onDueCellClick = (e: MouseEvent, item: Task) => {
+			// Ctrl/⌘ + click on the due cell should still toggle row selection,
+			// just like the rest of the row — don't stopPropagation in that case.
+			if (isMultiSelect(e)) return;
+			if (!isReschedulable(item)) return;
+			e.stopPropagation();
+			openReschedulePopover(item, { x: e.clientX, y: e.clientY });
+		};
+
+		const onRowContextMenu = (e: MouseEvent) => {
+			const target = e.target as HTMLElement | null;
+			const tr = target?.closest('tr');
+			if (!tr) return;
+			if (tr.closest('thead')) return;
+			const dataEl = tr.querySelector('[data-row-uuid]') as HTMLElement | null;
+			const uuid = dataEl?.getAttribute('data-row-uuid');
+			if (!uuid) return;
+			const item = currentItems.value.find(t => t.uuid === uuid);
+			if (!item) return;
+			e.preventDefault();
+			ctxMenu.task = item;
+			ctxMenu.x = e.clientX;
+			ctxMenu.y = e.clientY;
+			ctxMenu.open = true;
+		};
+
+		const onApplyReschedule = async ({ task, due }: { task: Task; due: string | undefined }) => {
+			// Defensive: a stale popover task without a uuid would be silently
+			// dropped by the backend and look like a no-op to the user.
+			if (!task || !task.uuid) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Failed to reschedule task'
+				});
+				return;
+			}
+			try {
+				await store.dispatch('updateTasks', [{ ...task, due }]);
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Failed to reschedule task'
+				});
+			}
+		};
+
+		const onCtxReschedule = (task: Task) => {
+			openReschedulePopover(task, { x: ctxMenu.x, y: ctxMenu.y });
+		};
+
 		const onCompleteClick = (event: MouseEvent, task: Task) => {
 			event.stopPropagation();
 			if (isMultiSelect(event)) {
@@ -1029,6 +1150,8 @@ export default defineComponent({
 			|| store.state.searchOpen
 			|| store.state.quickAddOpen
 			|| store.state.taskDialog.open
+			|| reschedule.open
+			|| ctxMenu.open
 			|| layoutDialogsOpen.value;
 
 		const isActivatorTarget = (el: EventTarget | null) => {
@@ -1037,7 +1160,7 @@ export default defineComponent({
 			return tag === 'BUTTON' || tag === 'A';
 		};
 
-		const GRID_KEYS = new Set(['j', 'k', 'e', 'x', ' ', 'Enter', 'ArrowUp', 'ArrowDown']);
+		const GRID_KEYS = new Set(['j', 'k', 'e', 'r', 'x', ' ', 'Enter', 'ArrowUp', 'ArrowDown']);
 
 		const onGridKeydown = (e: KeyboardEvent) => {
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1058,6 +1181,19 @@ export default defineComponent({
 				case 'e':
 					if (!cur) return;
 					e.preventDefault(); editTask(cur); return;
+				case 'r': {
+					if (!cur) return;
+					// Always stop the bubble-phase global 'r' (refresh) when a
+					// row is under cursor — pressing 'r' on a non-eligible row
+					// silently doing a refresh would be surprising, so we
+					// no-op instead.
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					if (!isReschedulable(cur)) return;
+					const anchor = document.querySelector('.tw-row--cursor') as HTMLElement | null;
+					openReschedulePopover(cur, anchor);
+					return;
+				}
 				case 'Enter':
 					// Enter natively activates focused buttons/links — don't double-fire.
 					if (onActivator) return;
@@ -1075,9 +1211,11 @@ export default defineComponent({
 			}
 		};
 
-		onMounted(() => window.addEventListener('keydown', onGridKeydown));
+		// Capture phase so the row-scoped 'r' handler runs before the global
+		// refresh handler in layouts/default.vue and can stopImmediatePropagation.
+		onMounted(() => window.addEventListener('keydown', onGridKeydown, true));
 		onBeforeUnmount(() => {
-			window.removeEventListener('keydown', onGridKeydown);
+			window.removeEventListener('keydown', onGridKeydown, true);
 		});
 
 		const tabCount = (st: string): number => classifiedTasks.value[st]?.length ?? 0;
@@ -1144,8 +1282,19 @@ export default defineComponent({
 			showTodayScopeToggle,
 			isMobile,
 
+			reschedule,
+			ctxMenu,
+			isReschedulable,
+			onDueCellClick,
+			onRowContextMenu,
+			onApplyReschedule,
+			onCtxReschedule,
+			togglePending,
+
 			ConfirmationDialog,
-			ColumnDialog
+			ColumnDialog,
+			ReschedulePopover,
+			RowContextMenu
 		};
 	}
 });
@@ -1154,6 +1303,20 @@ export default defineComponent({
 <style>
 .tw-table tr.tw-row--cursor > td:first-child {
 	box-shadow: inset 2px 0 0 0 currentColor;
+}
+
+.tw-due-cell {
+	display: inline-block;
+	padding: 2px 6px;
+	margin: 0 -6px;
+	border-radius: 4px;
+	transition: background-color 0.08s ease;
+}
+.tw-due-cell--clickable {
+	cursor: pointer;
+}
+.tw-due-cell--clickable:hover {
+	background: rgba(127, 127, 127, 0.12);
 }
 
 .tw-profile-chip {

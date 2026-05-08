@@ -78,6 +78,7 @@ export default defineComponent({
 				items: [
 					{ label: 'Move cursor', keys: ['j / k', '↓ / ↑'] },
 					{ label: 'Edit', keys: ['Enter', 'e'] },
+					{ label: 'Reschedule', keys: ['r'] },
 					{ label: 'Toggle complete', keys: ['Space'] },
 					{ label: 'Toggle selection', keys: ['x'] },
 					{ label: 'Close / cancel', keys: ['Esc'] }
