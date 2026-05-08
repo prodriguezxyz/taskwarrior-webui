@@ -22,6 +22,7 @@
 			<v-card class="tw-datetime-pop">
 				<v-date-picker
 					v-model="draftDate"
+					:picker-date.sync="pickerDate"
 					no-title
 					:first-day-of-week="1"
 					color="primary"
@@ -132,12 +133,15 @@ export default defineComponent({
 
 		const draftDate = ref<string | null>(null);
 		const draftTime = ref<string>('');
+		const pickerDate = ref<string | null>(null);
 
 		const syncDraft = () => {
+			const today = moment().startOf('day');
 			const parsed = parseDate(props.value);
 			if (parsed) {
-				draftDate.value = parsed.format('YYYY-MM-DD');
-				const t = parsed.format('HH:mm');
+				const local = parsed.local();
+				draftDate.value = local.format('YYYY-MM-DD');
+				const t = local.format('HH:mm');
 				if (t !== '00:00') {
 					draftTime.value = t;
 					timeActive.value = true;
@@ -146,11 +150,15 @@ export default defineComponent({
 					draftTime.value = '';
 					timeActive.value = false;
 				}
+				pickerDate.value = parsed.isBefore(today)
+					? today.format('YYYY-MM')
+					: local.format('YYYY-MM');
 			}
 			else {
 				draftDate.value = null;
 				draftTime.value = '';
 				timeActive.value = false;
+				pickerDate.value = today.format('YYYY-MM');
 			}
 		};
 
@@ -176,7 +184,7 @@ export default defineComponent({
 			menu.value = false;
 		};
 
-		return { menu, timeActive, timeInputRef, draftDate, draftTime, displayValue, openTime, apply, clear };
+		return { menu, timeActive, timeInputRef, draftDate, draftTime, pickerDate, displayValue, openTime, apply, clear };
 	}
 });
 </script>

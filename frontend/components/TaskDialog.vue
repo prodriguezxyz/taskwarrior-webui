@@ -157,7 +157,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, watch, computed, ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, watch, computed, ref, nextTick } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import { accessorType, TaskWithProfile } from '../store';
 
@@ -265,16 +265,22 @@ export default defineComponent({
 			const search = (projectSearch.value || '').trim();
 			if (!search) return;
 			const searchLower = search.toLowerCase();
-			const matches = (projects.value as string[]).filter(
-				p => p.toLowerCase().includes(searchLower)
-			);
-			if (matches.length === 1 && matches[0].toLowerCase() !== searchLower) {
-				e.preventDefault();
-				e.stopPropagation();
-				formData.value.project = matches[0];
-				projectSearch.value = matches[0];
-				projectComboRef.value?.blur();
-			}
+			const all = projects.value as string[];
+			// User already typed an exact project — let v-combobox commit it as-is.
+			if (all.some(p => p.toLowerCase() === searchLower)) return;
+			// Prefer prefix matches over arbitrary substring matches so "auto" lands
+			// on "automation" rather than something like "fooauto".
+			const prefix = all.filter(p => p.toLowerCase().startsWith(searchLower));
+			const substring = all.filter(p => p.toLowerCase().includes(searchLower));
+			const candidate = prefix[0] || substring[0];
+			if (!candidate) return;
+			e.preventDefault();
+			e.stopPropagation();
+			formData.value.project = candidate;
+			projectSearch.value = candidate;
+			// Defer blur so the v-combobox internal search has time to sync to the
+			// new value; otherwise blur commits the partial text and overwrites it.
+			nextTick(() => projectComboRef.value?.blur());
 		};
 
 		const tagsSearch = ref<string | null>('');
@@ -283,15 +289,17 @@ export default defineComponent({
 			if (!search) return;
 			const searchLower = search.toLowerCase();
 			const currentTags = (formData.value.tags || []) as string[];
-			const matches = (tags.value as string[]).filter(
-				t => t.toLowerCase().includes(searchLower) && !currentTags.includes(t)
-			);
-			if (matches.length === 1 && matches[0].toLowerCase() !== searchLower) {
-				e.preventDefault();
-				e.stopPropagation();
-				formData.value.tags = [...currentTags, matches[0]];
-				tagsSearch.value = null;
-			}
+			const all = (tags.value as string[]).filter(t => !currentTags.includes(t));
+			// Exact existing tag — let combobox add it verbatim.
+			if (all.some(t => t.toLowerCase() === searchLower)) return;
+			const prefix = all.filter(t => t.toLowerCase().startsWith(searchLower));
+			const substring = all.filter(t => t.toLowerCase().includes(searchLower));
+			const candidate = prefix[0] || substring[0];
+			if (!candidate) return;
+			e.preventDefault();
+			e.stopPropagation();
+			formData.value.tags = [...currentTags, candidate];
+			tagsSearch.value = null;
 		};
 
 		const recur = ref(Boolean(props.task?.recur));
