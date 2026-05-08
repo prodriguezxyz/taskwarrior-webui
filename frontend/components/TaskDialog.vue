@@ -157,7 +157,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, watch, computed, ref } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, watch, computed, ref, nextTick } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import { accessorType, TaskWithProfile } from '../store';
 
@@ -277,9 +277,13 @@ export default defineComponent({
 		const onProjectChange = (val: string | null) => {
 			if (!val) return;
 			const candidate = bestMatch(String(val), projects.value as string[]);
-			if (!candidate) return;
-			formData.value.project = candidate;
-			projectSearch.value = candidate;
+			if (candidate) {
+				formData.value.project = candidate;
+				projectSearch.value = candidate;
+			}
+			// Close the dropdown after a single-select commit. Deferred so the
+			// remap above lands before blur reads the combobox internal state.
+			nextTick(() => projectComboRef.value?.blur());
 		};
 
 		const tagsSearch = ref<string | null>('');
