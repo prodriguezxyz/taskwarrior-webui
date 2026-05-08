@@ -37,7 +37,7 @@
 						:search-input.sync="projectSearch"
 						hide-selected
 						label="Project"
-						@keydown.enter.native.capture="onProjectEnter"
+						@change="onProjectChange"
 					/>
 					<v-select
 						v-if="memberItems.length > 1"
@@ -59,7 +59,7 @@
 						multiple
 						label="Tags"
 						hint="Press tab or enter to add new tags"
-						@keydown.enter.native.capture="onTagsEnter"
+						@change="onTagsChange"
 					/>
 					<v-row class="px-3">
 						<DateTimeInput
@@ -157,7 +157,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useStore, watch, computed, ref, nextTick } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, watch, computed, ref } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import { accessorType, TaskWithProfile } from '../store';
 
@@ -261,44 +261,45 @@ export default defineComponent({
 		const projectSearch = ref<string | null>('');
 		const projectComboRef = ref<any>(null);
 
-		const onProjectEnter = (e: KeyboardEvent) => {
-			const search = (projectSearch.value || '').trim();
-			if (!search) return;
-			const searchLower = search.toLowerCase();
-			const all = projects.value as string[];
-			// User already typed an exact project — let v-combobox commit it as-is.
-			if (all.some(p => p.toLowerCase() === searchLower)) return;
-			// Prefer prefix matches over arbitrary substring matches so "auto" lands
-			// on "automation" rather than something like "fooauto".
-			const prefix = all.filter(p => p.toLowerCase().startsWith(searchLower));
-			const substring = all.filter(p => p.toLowerCase().includes(searchLower));
-			const candidate = prefix[0] || substring[0];
+		// v-combobox commits whatever text is in the input on Enter/blur, even
+		// when it's only a prefix of an existing item. We remap that committed
+		// value to the best matching project ("auto" → "automation"). Prefer
+		// prefix matches over arbitrary substring matches.
+		const bestMatch = (val: string, pool: string[]) => {
+			const lower = val.toLowerCase();
+			if (pool.some(p => p.toLowerCase() === lower)) return null;
+			const prefix = pool.filter(p => p.toLowerCase().startsWith(lower));
+			if (prefix[0]) return prefix[0];
+			const substring = pool.filter(p => p.toLowerCase().includes(lower));
+			return substring[0] || null;
+		};
+
+		const onProjectChange = (val: string | null) => {
+			if (!val) return;
+			const candidate = bestMatch(String(val), projects.value as string[]);
 			if (!candidate) return;
-			e.preventDefault();
-			e.stopPropagation();
 			formData.value.project = candidate;
 			projectSearch.value = candidate;
-			// Defer blur so the v-combobox internal search has time to sync to the
-			// new value; otherwise blur commits the partial text and overwrites it.
-			nextTick(() => projectComboRef.value?.blur());
 		};
 
 		const tagsSearch = ref<string | null>('');
-		const onTagsEnter = (e: KeyboardEvent) => {
-			const search = (tagsSearch.value || '').trim();
-			if (!search) return;
-			const searchLower = search.toLowerCase();
-			const currentTags = (formData.value.tags || []) as string[];
-			const all = (tags.value as string[]).filter(t => !currentTags.includes(t));
-			// Exact existing tag — let combobox add it verbatim.
-			if (all.some(t => t.toLowerCase() === searchLower)) return;
-			const prefix = all.filter(t => t.toLowerCase().startsWith(searchLower));
-			const substring = all.filter(t => t.toLowerCase().includes(searchLower));
-			const candidate = prefix[0] || substring[0];
-			if (!candidate) return;
-			e.preventDefault();
-			e.stopPropagation();
-			formData.value.tags = [...currentTags, candidate];
+		const onTagsChange = (vals: string[] | null) => {
+			if (!vals || !vals.length) return;
+			const pool = tags.value as string[];
+			let changed = false;
+			const remapped = vals.map(v => {
+				const candidate = bestMatch(String(v), pool);
+				if (candidate && candidate !== v) {
+					changed = true;
+					return candidate;
+				}
+				return v;
+			});
+			// Dedupe in case remapping collapsed two entries onto the same tag.
+			const unique = Array.from(new Set(remapped));
+			if (changed || unique.length !== vals.length) {
+				formData.value.tags = unique;
+			}
 			tagsSearch.value = null;
 		};
 
@@ -416,9 +417,9 @@ export default defineComponent({
 			showDialog,
 			projectSearch,
 			projectComboRef,
-			onProjectEnter,
+			onProjectChange,
 			tagsSearch,
-			onTagsEnter,
+			onTagsChange,
 			parentTemplate,
 			editParent
 		};
