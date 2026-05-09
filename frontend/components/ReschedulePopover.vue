@@ -66,7 +66,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, watch, nextTick, PropType } from '@nuxtjs/composition-api';
+import { defineComponent, computed, ref, watch, nextTick, onBeforeUnmount, PropType } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { parseDateInput, dayOfWeekFrom } from '../utils/dateParse';
@@ -153,16 +153,54 @@ export default defineComponent({
 			else focusPreset(idx - 1);
 		};
 
+		let focusTimer: number | null = null;
+
+		// Backstop Esc handler. The wrapper div's @keydown.esc only fires when
+		// focus is inside the popover; if the menu's lazy-rendered content
+		// hasn't received focus yet, we'd otherwise miss the keystroke. Using
+		// capture so we beat any row-level shortcut handler.
+		const onDocKeydown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape' && open.value) {
+				e.stopPropagation();
+				e.preventDefault();
+				close();
+			}
+		};
+
 		watch(open, v => {
-			if (!v) return;
-			text.value = '';
-			// v-menu uses fade-transition; the input element is mounted
-			// immediately but the menu container is briefly opacity:0 and
-			// not focusable. requestAnimationFrame after nextTick lets the
-			// transition's first paint pass before we steal focus.
-			nextTick(() => {
-				requestAnimationFrame(() => inputRef.value?.focus());
-			});
+			if (focusTimer !== null) {
+				window.clearTimeout(focusTimer);
+				focusTimer = null;
+			}
+			if (v) {
+				text.value = '';
+				// v-menu lazy-renders its content and fades it in; nextTick +
+				// a short timeout lets the element become focusable before we
+				// try to focus it. select() is a no-op on empty text but lets
+				// the user overwrite any future autofill cleanly. Each step
+				// re-checks open.value because the popover can be closed
+				// between the watch firing and the timer running.
+				nextTick(() => {
+					if (!open.value) return;
+					focusTimer = window.setTimeout(() => {
+						focusTimer = null;
+						if (!open.value) return;
+						const el = inputRef.value;
+						if (!el) return;
+						el.focus();
+						el.select();
+					}, 60);
+				});
+				document.addEventListener('keydown', onDocKeydown, true);
+			}
+			else {
+				document.removeEventListener('keydown', onDocKeydown, true);
+			}
+		});
+
+		onBeforeUnmount(() => {
+			if (focusTimer !== null) window.clearTimeout(focusTimer);
+			document.removeEventListener('keydown', onDocKeydown, true);
 		});
 
 		return {

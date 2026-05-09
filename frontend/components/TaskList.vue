@@ -210,12 +210,15 @@
 				style="width: 100%"
 				@click:row="onRowClick"
 				@contextmenu.native="onRowContextMenu"
+				@mouseover.native="onTableMouseOver"
+				@mouseleave.native="onTableMouseLeave"
 			>
 				<template v-slot:item._complete="{ item }">
 					<button
 						type="button"
 						class="tw-complete"
 						:class="completeBtnClass(item)"
+						:data-row-uuid="item.uuid"
 						:title="completeBtnTitle(item)"
 						:aria-label="completeBtnTitle(item)"
 						@click="onCompleteClick($event, item)"
@@ -1078,6 +1081,36 @@ export default defineComponent({
 			return currentItems.value.find(t => t.uuid === cursorUuid.value) || null;
 		});
 
+		// Soft cursor driven by mouse hover. Used as a fallback for row
+		// shortcuts (r, e, x, …) so the user doesn't need to navigate with
+		// j/k first. Doesn't change the visual highlight — that stays tied to
+		// cursorUuid — to keep mouse movement from making the cursor jitter.
+		const hoverUuid = ref<string | null>(null);
+
+		const hoverTask = computed((): Task | null => {
+			if (!hoverUuid.value) return null;
+			return currentItems.value.find(t => t.uuid === hoverUuid.value) || null;
+		});
+
+		const onTableMouseOver = (e: MouseEvent) => {
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
+			// Walk up to the row, then back down to the data-row-uuid sentinel
+			// in the description cell. closest() alone wouldn't work from
+			// sibling cells (project, due, tags, actions, …) because the
+			// sentinel lives only in the description column.
+			const tr = target.closest('tr');
+			if (!tr) return;
+			const span = tr.querySelector('[data-row-uuid]') as HTMLElement | null;
+			if (!span) return;
+			const uuid = span.dataset.rowUuid;
+			if (uuid && uuid !== hoverUuid.value) hoverUuid.value = uuid;
+		};
+
+		const onTableMouseLeave = () => {
+			hoverUuid.value = null;
+		};
+
 		const moveCursor = async (delta: number) => {
 			const items = currentItems.value;
 			if (!items.length) return;
@@ -1169,6 +1202,11 @@ export default defineComponent({
 			if (isGridBlocked()) return;
 
 			const cur = cursorTask.value;
+			// Row-action shortcuts (e, r, x, Enter, space) prefer the keyboard
+			// cursor but fall back to whichever row the mouse is hovering, so
+			// they work without j/k. j/k navigation deliberately ignores hover
+			// since it operates on the cursor itself.
+			const target = cur || hoverTask.value;
 			const onActivator = isActivatorTarget(e.target);
 
 			switch (e.key) {
@@ -1179,35 +1217,44 @@ export default defineComponent({
 				case 'ArrowUp':
 					e.preventDefault(); moveCursor(-1); return;
 				case 'e':
-					if (!cur) return;
-					e.preventDefault(); editTask(cur); return;
+					if (!target) return;
+					e.preventDefault(); editTask(target); return;
 				case 'r': {
-					if (!cur) return;
+					if (!target) return;
 					// Always stop the bubble-phase global 'r' (refresh) when a
 					// row is under cursor — pressing 'r' on a non-eligible row
 					// silently doing a refresh would be surprising, so we
 					// no-op instead.
 					e.preventDefault();
 					e.stopImmediatePropagation();
-					if (!isReschedulable(cur)) return;
-					const anchor = document.querySelector('.tw-row--cursor') as HTMLElement | null;
-					openReschedulePopover(cur, anchor);
+					if (!isReschedulable(target)) return;
+					let anchor: HTMLElement | null = null;
+					if (cur) {
+						anchor = document.querySelector('.tw-row--cursor') as HTMLElement | null;
+					}
+					else {
+						const span = document.querySelector(
+							`[data-row-uuid="${target.uuid}"]`
+						) as HTMLElement | null;
+						anchor = (span?.closest('tr') as HTMLElement | null) || null;
+					}
+					openReschedulePopover(target, anchor);
 					return;
 				}
 				case 'Enter':
 					// Enter natively activates focused buttons/links — don't double-fire.
 					if (onActivator) return;
-					if (!cur) return;
-					e.preventDefault(); editTask(cur); return;
+					if (!target) return;
+					e.preventDefault(); editTask(target); return;
 				case 'x':
-					if (!cur) return;
-					e.preventDefault(); toggleSelection(cur); return;
+					if (!target) return;
+					e.preventDefault(); toggleSelection(target); return;
 				case ' ':
 					// Space natively activates focused buttons/links — don't double-fire.
 					if (onActivator) return;
-					if (!cur) return;
+					if (!target) return;
 					e.preventDefault();
-					togglePending(cur);
+					togglePending(target);
 			}
 		};
 
@@ -1237,6 +1284,8 @@ export default defineComponent({
 			editParentTemplate,
 			onDescriptionClick,
 			onRowClick,
+			onTableMouseOver,
+			onTableMouseLeave,
 			onActionClick,
 			onCompleteClick,
 			completeBtnIcon,
