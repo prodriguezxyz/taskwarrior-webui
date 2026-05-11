@@ -370,6 +370,12 @@ export default defineComponent({
 			if (!valid) return;
 			try {
 				await store.dispatch('updateTasks', [{
+					// Force the active profile on new tasks. For edits, _profile
+					// already rides along through the spread (cloned from the row
+					// the dialog was opened on); without this line a "+ new task"
+					// from a cross-profile view (Today / Mine) would default to
+					// the backend's allowed[0] instead of what the user picked.
+					_profile: contextProfile.value || undefined,
 					...formData.value,
 					annotations: formData.value.annotations || [],
 					project: formData.value.project || undefined,

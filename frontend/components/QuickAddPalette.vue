@@ -99,8 +99,9 @@
 
 <script lang="ts">
 import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxtjs/composition-api';
+import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
-import { accessorType } from '../store';
+import { accessorType, TaskWithProfile } from '../store';
 import { dayIndexOf, parseDateToken } from '../utils/dateParse';
 
 const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
@@ -198,15 +199,25 @@ export default defineComponent({
 		const submitting = ref(false);
 		const inputRef = ref<HTMLInputElement | null>(null);
 
+		// Suggestions are scoped to the active profile in multi-profile mode so
+		// projects/tags from other profiles don't leak into the picker (and don't
+		// confuse the user into committing a project that won't exist where the
+		// task actually lands).
 		const projects = computed(() => {
 			const set = new Set<string>();
-			for (const p of store.getters.projects as string[]) {
-				if (p) set.add(p);
+			for (const t of store.getters.ownTasks as Task[]) {
+				if (t.project) set.add(t.project);
 			}
 			return Array.from(set).sort();
 		});
 
-		const tags = computed(() => store.getters.tags as string[]);
+		const tags = computed(() => {
+			const set = new Set<string>();
+			for (const t of store.getters.ownTasks as Task[]) {
+				if (t.tags) for (const tag of t.tags) set.add(tag);
+			}
+			return Array.from(set).sort();
+		});
 
 		const currentToken = computed(() => {
 			const pos = cursorPos.value;
@@ -320,15 +331,20 @@ export default defineComponent({
 			const p = parsed.value;
 			if (!p.description) return;
 			submitting.value = true;
+			// Route the write to the active profile. Without this the backend
+			// falls back to the user's first allowed profile, which can differ
+			// from the one the user is looking at.
+			const payload: TaskWithProfile = {
+				_profile: store.state.settings.profile || undefined,
+				description: p.description,
+				project: p.project,
+				tags: p.tags.length ? p.tags : undefined,
+				priority: p.priority,
+				due: p.due,
+				annotations: []
+			};
 			try {
-				await store.dispatch('updateTasks', [{
-					description: p.description,
-					project: p.project,
-					tags: p.tags.length ? p.tags : undefined,
-					priority: p.priority,
-					due: p.due,
-					annotations: []
-				}]);
+				await store.dispatch('updateTasks', [payload]);
 				store.commit('setNotification', {
 					color: 'success',
 					text: 'Task added'
