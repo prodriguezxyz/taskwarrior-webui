@@ -72,6 +72,56 @@ export function parseDateToken(tok: string): string | undefined {
 	return undefined;
 }
 
+// Parses a clock-time token such as "15:00", "3pm", "9:30am", "15h", "15h30"
+// or "noon" into 24-hour { hours, minutes }, or undefined if it isn't a time.
+// A time must carry a marker (colon, am/pm, an "h", or the word "noon"); bare
+// numbers like "3" are rejected on purpose so they stay part of the description.
+export function parseTimeToken(tok: string): { hours: number; minutes: number } | undefined {
+	const lower = tok.toLowerCase();
+
+	if (lower === 'noon') return { hours: 12, minutes: 0 };
+
+	// 12-hour: 3pm, 3:30pm, 11am, 12:15am
+	const ampm = /^(\d{1,2})(?::(\d{2}))?(am|pm)$/.exec(lower);
+	if (ampm) {
+		let h = parseInt(ampm[1], 10);
+		const m = ampm[2] ? parseInt(ampm[2], 10) : 0;
+		if (h < 1 || h > 12 || m > 59) return undefined;
+		if (ampm[3] === 'am') h = h === 12 ? 0 : h;
+		else h = h === 12 ? 12 : h + 12;
+		return { hours: h, minutes: m };
+	}
+
+	// 24-hour: 15:00, 9:30, 09:05
+	const colon = /^(\d{1,2}):(\d{2})$/.exec(lower);
+	if (colon) {
+		const h = parseInt(colon[1], 10);
+		const m = parseInt(colon[2], 10);
+		if (h > 23 || m > 59) return undefined;
+		return { hours: h, minutes: m };
+	}
+
+	// European shorthand: 15h, 15h30
+	const hForm = /^(\d{1,2})h(\d{2})?$/.exec(lower);
+	if (hForm) {
+		const h = parseInt(hForm[1], 10);
+		const m = hForm[2] ? parseInt(hForm[2], 10) : 0;
+		if (h > 23 || m > 59) return undefined;
+		return { hours: h, minutes: m };
+	}
+
+	return undefined;
+}
+
+// Combines a date-only string (YYYY-MM-DD) and a parsed time into the local
+// datetime string the rest of the app uses for timed due dates
+// (YYYY-MM-DDTHH:mm:00) — the same shape DateTimeInput emits.
+export function combineDateTime(date: string, time: { hours: number; minutes: number }): string {
+	const hh = String(time.hours).padStart(2, '0');
+	const mm = String(time.minutes).padStart(2, '0');
+	return `${date}T${hh}:${mm}:00`;
+}
+
 // Parses multi-token strings such as "next monday" or "this fri" before
 // delegating to parseDateToken. Use for free-text user input where tokens
 // arrive separated by whitespace.

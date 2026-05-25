@@ -15,7 +15,7 @@
 					type="text"
 					class="tw-palette__input"
 					aria-label="Quick add task"
-					placeholder="Buy milk #shopping @errands tomorrow p2…"
+					placeholder="Buy milk #shopping @errands tomorrow 3pm p2…"
 					autocomplete="off"
 					spellcheck="false"
 					enterkeyhint="done"
@@ -85,6 +85,8 @@
 					<kbd>next mon</kbd>
 					<kbd>+3d</kbd>
 					<kbd>eow</kbd>
+					<kbd>3pm</kbd>
+					<kbd>15:00</kbd>
 				</span>
 				<span class="tw-palette__hint-keys">
 					<kbd>↵</kbd>
@@ -102,7 +104,7 @@ import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxt
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
-import { dayIndexOf, parseDateToken } from '../utils/dateParse';
+import { dayIndexOf, parseDateToken, parseTimeToken, combineDateTime } from '../utils/dateParse';
 
 const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
 	'1': 'H',
@@ -138,10 +140,18 @@ function parseQuickAdd(input: string): Parsed {
 				continue;
 			}
 		}
+		// Merge a clock time split across tokens: "3 pm" -> "3pm", "9:30 am" -> "9:30am".
+		if (/^\d{1,2}(:\d{2})?$/.test(lower) && (peek === 'am' || peek === 'pm')) {
+			tokens.push(`${lower}${peek}`);
+			i++;
+			continue;
+		}
 		tokens.push(cur);
 	}
 
 	const remaining: string[] = [];
+	let dueDate: string | undefined;
+	let dueTime: { hours: number; minutes: number } | undefined;
 
 	for (const tok of tokens) {
 		if (!tok) continue;
@@ -160,13 +170,22 @@ function parseQuickAdd(input: string): Parsed {
 			out.priority = PRIORITY_MAP[pri[1]];
 			continue;
 		}
-		const due = parseDateToken(tok);
-		if (due) {
-			out.due = due;
+		const date = parseDateToken(tok);
+		if (date) {
+			dueDate = date;
+			continue;
+		}
+		const time = parseTimeToken(tok);
+		if (time) {
+			dueTime = time;
 			continue;
 		}
 		remaining.push(tok);
 	}
+
+	// A bare time ("3pm") with no day attaches to today; "tomorrow 3pm" combines both.
+	if (dueTime) out.due = combineDateTime(dueDate ?? moment().format('YYYY-MM-DD'), dueTime);
+	else if (dueDate) out.due = dueDate;
 
 	out.description = remaining.join(' ').trim();
 	return out;
@@ -175,13 +194,16 @@ function parseQuickAdd(input: string): Parsed {
 function displayDate(str?: string) {
 	if (!str) return '';
 	const date = moment(str);
+	const hasTime = /T\d{2}:\d{2}/.test(str) && !(date.hour() === 0 && date.minute() === 0);
 	const today = moment().startOf('day');
-	const diffDays = date.startOf('day').diff(today, 'days');
-	if (diffDays === 0) return 'today';
-	if (diffDays === 1) return 'tomorrow';
-	if (diffDays === -1) return 'yesterday';
-	if (diffDays > 1 && diffDays < 7) return date.format('dddd');
-	return date.format('YYYY-MM-DD');
+	const diffDays = date.clone().startOf('day').diff(today, 'days');
+	let label: string;
+	if (diffDays === 0) label = 'today';
+	else if (diffDays === 1) label = 'tomorrow';
+	else if (diffDays === -1) label = 'yesterday';
+	else if (diffDays > 1 && diffDays < 7) label = date.format('dddd');
+	else label = date.format('YYYY-MM-DD');
+	return hasTime ? `${label} ${date.format('HH:mm')}` : label;
 }
 
 export default defineComponent({
