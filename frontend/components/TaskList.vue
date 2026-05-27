@@ -364,6 +364,7 @@
 				@reschedule="onCtxReschedule"
 				@complete="togglePending"
 				@delete="onRowDelete"
+				@move="onCtxMove"
 			/>
 		</div>
 	</div>
@@ -380,7 +381,7 @@ import RowContextMenu from '../components/RowContextMenu.vue';
 import moment from 'moment';
 import urlRegex from 'url-regex-safe';
 import normalizeUrl from 'normalize-url';
-import { accessorType, isCrossProfileView } from '../store';
+import { accessorType, isCrossProfileView, TaskWithProfile } from '../store';
 import { collapseRecurring } from '../utils/collapse';
 
 // True when the stored date has no meaningful time component.
@@ -894,6 +895,33 @@ export default defineComponent({
 			openReschedulePopover(task, { x: ctxMenu.x, y: ctxMenu.y });
 		};
 
+		// Move a task wholesale to another profile from the context menu. Keeps
+		// the task's project (re-homing it as-is); drops the assignee since member
+		// lists are per-profile. Delegates the create-in-dest/delete-from-source
+		// dance to the moveTask store action.
+		const onCtxMove = async ({ task, toProfile }: { task: Task; toProfile: string }) => {
+			const fromProfile = (task as TaskWithProfile)._profile;
+			if (!task.uuid || !fromProfile || fromProfile === toProfile) return;
+			try {
+				await store.dispatch('moveTask', {
+					task: { ...task, assignee: undefined, _profile: toProfile },
+					fromProfile,
+					toProfile
+				});
+			}
+			catch (err) {
+				const leftover = (err as any)?.moveLeftover;
+				store.commit('setNotification', {
+					color: leftover ? 'warning' : 'error',
+					text: leftover
+						? `Moved to ${leftover.toProfile}, but couldn't remove the original from ${leftover.fromProfile} — delete it manually`
+						: 'Failed to move task'
+				});
+				return;
+			}
+			store.commit('setNotification', { color: 'success', text: `Moved to ${toProfile}` });
+		};
+
 		const onCompleteClick = (event: MouseEvent, task: Task) => {
 			event.stopPropagation();
 			if (isMultiSelect(event)) {
@@ -1338,6 +1366,7 @@ export default defineComponent({
 			onRowContextMenu,
 			onApplyReschedule,
 			onCtxReschedule,
+			onCtxMove,
 			togglePending,
 
 			ConfirmationDialog,

@@ -331,6 +331,44 @@ export const actions: ActionTree<RootState, RootState> = {
 		}
 	},
 
+	// Move a task from one profile (Taskwarrior) to another. There is no atomic
+	// cross-profile primitive — profiles are independent sync targets — so we
+	// create in the destination FIRST (taskwarrior-lib `import` preserves the
+	// uuid/annotations/dates) and delete from the source AFTER. Worst case on a
+	// partial failure is a duplicate (recoverable), never data loss.
+	async moveTask(context, payload: { task: TaskWithProfile, fromProfile: string, toProfile: string }) {
+		const { task, fromProfile, toProfile } = payload;
+		const body = stripInternalFields(task);
+		let created = false;
+		try {
+			await this.$axios.$put('/api/tasks', { tasks: [body] }, { headers: { 'X-Profile': toProfile } });
+			created = true;
+			await this.$axios.$delete('/api/tasks', {
+				params: { tasks: [task.uuid] },
+				headers: { 'X-Profile': fromProfile }
+			});
+		}
+		catch (err) {
+			// Create succeeded but delete failed → the task now lives in BOTH
+			// profiles. Surface a specific error so the dialog can tell the user
+			// to remove the leftover manually, instead of a generic failure.
+			if (created) {
+				const e: any = new Error(`moved to ${toProfile} but original left in ${fromProfile}`);
+				e.moveLeftover = { uuid: task.uuid, fromProfile, toProfile };
+				throw e;
+			}
+			throw err;
+		}
+		finally {
+			try {
+				await context.dispatch('fetchTasks');
+			}
+			catch (err) {
+				console.error('[store] fetchTasks after move failed:', err);
+			}
+		}
+	},
+
 	async syncTasks(context) {
 		const profiles = context.state.profiles;
 		if (profiles.length <= 1) {

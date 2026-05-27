@@ -37,6 +37,21 @@
 				<v-icon size="16" class="tw-rowctx__icon" aria-hidden="true">{{ completeIcon }}</v-icon>
 				<span>{{ completeLabel }}</span>
 			</button>
+			<template v-if="moveTargets.length">
+				<div class="tw-rowctx__sep" role="separator" />
+				<div class="tw-rowctx__label">Move to</div>
+				<button
+					v-for="p in moveTargets"
+					:key="p"
+					type="button"
+					role="menuitem"
+					class="tw-rowctx__item"
+					@click="onMove(p)"
+				>
+					<v-icon size="16" class="tw-rowctx__icon" aria-hidden="true">mdi-swap-horizontal</v-icon>
+					<span>{{ p }}</span>
+				</button>
+			</template>
 			<div class="tw-rowctx__sep" role="separator" />
 			<button
 				type="button"
@@ -52,8 +67,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, PropType } from '@nuxtjs/composition-api';
+import { defineComponent, computed, PropType, useStore } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
+import { accessorType, TaskWithProfile } from '../store';
 
 export default defineComponent({
 	props: {
@@ -64,9 +80,32 @@ export default defineComponent({
 	},
 
 	setup(props, ctx) {
+		const store = useStore<typeof accessorType>();
+
 		const open = computed({
 			get: () => props.value,
 			set: v => ctx.emit('input', v)
+		});
+
+		// A task can be moved to another profile only when it's a standalone,
+		// real, live task: recurring templates / child instances and collapsed
+		// series representatives would break their series if relocated, and an
+		// already-deleted task can't be re-deleted from the source (the move's
+		// final step), which would surface a spurious "leftover" warning.
+		const canMove = computed(() => {
+			const t = props.task as (TaskWithProfile & { _siblingUuids?: string[] }) | null;
+			if (!t || !t.uuid) return false;
+			if (t.status === 'recurring' || t.status === 'deleted' || (t as any).parent) return false;
+			if (t._siblingUuids && t._siblingUuids.length) return false;
+			return true;
+		});
+
+		// Other profiles this task could move to (every allowed profile except
+		// the one it already lives in). Empty unless we're multi-profile.
+		const moveTargets = computed(() => {
+			if (!store.getters.multiProfile || !canMove.value) return [];
+			const current = (props.task as TaskWithProfile | null)?._profile;
+			return store.state.profiles.map(p => p.name).filter(n => n !== current);
 		});
 
 		const canReschedule = computed(() => {
@@ -117,6 +156,11 @@ export default defineComponent({
 			ctx.emit('delete', props.task);
 			close();
 		};
+		const onMove = (toProfile: string) => {
+			if (!props.task) return;
+			ctx.emit('move', { task: props.task, toProfile });
+			close();
+		};
 
 		return {
 			open,
@@ -126,10 +170,12 @@ export default defineComponent({
 			completeIcon,
 			deleteLabel,
 			deleteIcon,
+			moveTargets,
 			close,
 			onReschedule,
 			onComplete,
-			onDelete
+			onDelete,
+			onMove
 		};
 	}
 });
@@ -195,6 +241,14 @@ export default defineComponent({
 }
 .tw-rowctx__icon {
 	opacity: 0.7;
+}
+.tw-rowctx__label {
+	padding: 4px 12px 2px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	opacity: 0.5;
 }
 .tw-rowctx__sep {
 	height: 1px;
