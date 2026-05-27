@@ -32,13 +32,18 @@
 					/>
 					<v-combobox
 						ref="projectComboRef"
-						v-model="formData.project"
-						:items="projects"
+						v-model="projectModel"
+						:items="projectItems"
+						:item-text="multiProfile ? 'text' : undefined"
+						:return-object="multiProfile"
 						:search-input.sync="projectSearch"
 						hide-selected
 						label="Project"
 						@change="onProjectChange"
 					/>
+					<div v-if="willMove" class="tw-move-hint">
+						<v-icon x-small left>mdi-swap-horizontal</v-icon>{{ moveHint }}
+					</div>
 					<v-select
 						v-if="memberItems.length > 1"
 						v-model="formData.assignee"
@@ -148,8 +153,8 @@
 				<v-btn text @click="closeDialog" width="80px">
 					Cancel
 				</v-btn>
-				<v-btn color="primary" @click="submit" width="80px">
-					Submit
+				<v-btn color="primary" @click="submit" :width="willMove ? undefined : '80px'">
+					{{ submitLabel }}
 				</v-btn>
 			</v-card-actions>
 		</v-card>
@@ -183,6 +188,25 @@ export default defineComponent({
 			&& contextProfile.value !== store.state.settings.profile
 		);
 
+		const multiProfile = computed(() => store.getters.multiProfile);
+
+		// Destination profile chosen via the Project picker. Defaults to the
+		// profile the task already lives in; only diverges when the user picks a
+		// project that belongs to a different profile (→ triggers a move).
+		const targetProfile = ref(contextProfile.value);
+		const willMove = computed(() =>
+			multiProfile.value && targetProfile.value !== contextProfile.value
+		);
+		const moveHint = computed(() =>
+			props.task
+				? `Will move to "${targetProfile.value}"`
+				: `Will be created in "${targetProfile.value}"`
+		);
+		const submitLabel = computed(() => {
+			if (!willMove.value) return 'Submit';
+			return props.task ? `Move to ${targetProfile.value}` : `Add to ${targetProfile.value}`;
+		});
+
 		const inContext = (t: Task) =>
 			!store.getters.multiProfile
 			|| (t as TaskWithProfile)._profile === contextProfile.value;
@@ -194,6 +218,36 @@ export default defineComponent({
 				if (t.project) set.add(t.project);
 			}
 			return Array.from(set).sort();
+		});
+
+		// Items for the Project picker. Single-profile: plain strings (unchanged).
+		// Multi-profile: projects of EVERY profile, grouped under Vuetify header /
+		// divider rows, with the task's own profile listed first. Picking one from
+		// another profile sets targetProfile and moves the task there on submit.
+		const projectItems = computed(() => {
+			if (!multiProfile.value) return projects.value;
+			const byProfile = new Map<string, Set<string>>();
+			for (const t of store.state.tasks) {
+				if (!t.project) continue;
+				const prof = (t as TaskWithProfile)._profile || contextProfile.value;
+				if (!byProfile.has(prof)) byProfile.set(prof, new Set());
+				byProfile.get(prof)!.add(t.project);
+			}
+			const order = [
+				contextProfile.value,
+				...store.state.profiles.map(p => p.name).filter(n => n !== contextProfile.value)
+			];
+			const items: any[] = [];
+			for (const prof of order) {
+				const set = byProfile.get(prof);
+				if (!set || set.size === 0) continue;
+				if (items.length > 0) items.push({ divider: true });
+				items.push({ header: prof });
+				for (const proj of Array.from(set).sort()) {
+					items.push({ text: proj, project: proj, profile: prof });
+				}
+			}
+			return items;
 		});
 
 		const tags = computed(() => {
@@ -260,6 +314,11 @@ export default defineComponent({
 		const addAnnotationDescription = ref('');
 		const projectSearch = ref<string | null>('');
 		const projectComboRef = ref<any>(null);
+		// Display model for the Project combobox. Kept separate from
+		// formData.project: the combobox returns the whole item object in
+		// multi-profile mode, so onProjectChange normalises it back to a string
+		// here while recording the chosen project + targetProfile.
+		const projectModel = ref<any>((props.task as any)?.project || '');
 
 		// v-combobox commits whatever text is in the input on Enter/blur, even
 		// when it's only a prefix of an existing item. We remap that committed
@@ -274,12 +333,25 @@ export default defineComponent({
 			return substring[0] || null;
 		};
 
-		const onProjectChange = (val: string | null) => {
-			if (!val) return;
-			const candidate = bestMatch(String(val), projects.value as string[]);
-			if (candidate) {
-				formData.value.project = candidate;
-				projectSearch.value = candidate;
+		const onProjectChange = (val: any) => {
+			if (val && typeof val === 'object') {
+				// Picked an existing project item; it may live in another profile,
+				// in which case targetProfile diverges → submit() performs a move.
+				formData.value.project = val.project;
+				targetProfile.value = val.profile;
+				projectModel.value = val.text;
+				projectSearch.value = val.text;
+			}
+			else {
+				// Free text (or cleared) → new/existing project in the CURRENT
+				// profile. bestMatch remaps a prefix ("auto" → "automation").
+				const str = val ? String(val) : '';
+				const candidate = str ? bestMatch(str, projects.value as string[]) : null;
+				const finalProj = candidate || str;
+				formData.value.project = finalProj;
+				targetProfile.value = contextProfile.value;
+				projectModel.value = finalProj;
+				projectSearch.value = finalProj;
 			}
 			// Close the dropdown after a single-select commit. Deferred so the
 			// remap above lands before blur reads the combobox internal state.
@@ -344,6 +416,9 @@ export default defineComponent({
 			}
 
 			addAnnotationDescription.value = '';
+			projectModel.value = formData.value.project || '';
+			projectSearch.value = formData.value.project || '';
+			targetProfile.value = contextProfile.value;
 		};
 
 		watch(() => props.task, () => {
@@ -368,38 +443,64 @@ export default defineComponent({
 		const submit = async () => {
 			const valid = (formRef.value as any).validate();
 			if (!valid) return;
+			// Editing a task whose chosen destination profile differs from where
+			// it currently lives → a cross-profile move (create in dest + delete
+			// from source) rather than a plain update.
+			const crossProfile = Boolean(props.task) && willMove.value;
+			const payload: any = {
+				...formData.value,
+				annotations: formData.value.annotations || [],
+				project: formData.value.project || undefined,
+				// Member lists are per-profile, so a source-profile assignee is
+				// meaningless in the destination — drop it when crossing profiles.
+				assignee: crossProfile ? undefined : (formData.value.assignee || undefined),
+				scheduled: formData.value.scheduled || undefined,
+				due: formData.value.due || undefined,
+				until: formData.value.until || undefined,
+				wait: formData.value.wait || undefined,
+				priority: formData.value.priority === 'N' ? undefined : formData.value.priority,
+				recur: recur.value ? formData.value.recur : undefined,
+				// Destination profile applied LAST so the props.task spread above
+				// (which carries the original _profile) can't override it. For new
+				// tasks this routes to whatever profile the user picked, defaulting
+				// to the active one.
+				_profile: targetProfile.value || undefined
+			};
 			try {
-				await store.dispatch('updateTasks', [{
-					// Force the active profile on new tasks. For edits, _profile
-					// already rides along through the spread (cloned from the row
-					// the dialog was opened on); without this line a "+ new task"
-					// from a cross-profile view (Today / Mine) would default to
-					// the backend's allowed[0] instead of what the user picked.
-					_profile: contextProfile.value || undefined,
-					...formData.value,
-					annotations: formData.value.annotations || [],
-					project: formData.value.project || undefined,
-					assignee: formData.value.assignee || undefined,
-					scheduled: formData.value.scheduled || undefined,
-					due: formData.value.due || undefined,
-					until: formData.value.until || undefined,
-					wait: formData.value.wait || undefined,
-					priority: formData.value.priority === 'N' ? undefined : formData.value.priority,
-					recur: recur.value ? formData.value.recur : undefined
-				}]);
+				if (crossProfile) {
+					await store.dispatch('moveTask', {
+						task: payload,
+						fromProfile: contextProfile.value,
+						toProfile: targetProfile.value
+					});
+				}
+				else {
+					await store.dispatch('updateTasks', [payload]);
+				}
 			}
 			catch (err) {
+				const leftover = (err as any)?.moveLeftover;
+				if (leftover) {
+					// The move created the task in the destination but couldn't
+					// remove the source copy. Primary intent succeeded → warn + close.
+					store.commit('setNotification', {
+						color: 'warning',
+						text: `Moved to ${leftover.toProfile}, but couldn't remove the original from ${leftover.fromProfile} — delete it manually`
+					});
+					closeDialog();
+					return;
+				}
 				// Leave the dialog open so the user can fix or retry without
 				// losing their edits.
 				store.commit('setNotification', {
 					color: 'error',
-					text: `Failed to ${props.task ? 'update' : 'create'} the task`
+					text: `Failed to ${crossProfile ? 'move' : (props.task ? 'update' : 'create')} the task`
 				});
 				return;
 			}
 			store.commit('setNotification', {
 				color: 'success',
-				text: `Successfully ${props.task ? 'update' : 'create'} the task`
+				text: `Successfully ${crossProfile ? 'moved' : (props.task ? 'updated' : 'created')} the task`
 			});
 			closeDialog();
 		};
@@ -416,6 +517,12 @@ export default defineComponent({
 			formRef,
 			tags,
 			projects,
+			projectItems,
+			projectModel,
+			multiProfile,
+			willMove,
+			moveHint,
+			submitLabel,
 			memberItems,
 			priorities,
 			recur,
@@ -445,5 +552,16 @@ export default defineComponent({
 }
 .tw-edit-series:hover {
 	opacity: 1;
+}
+.tw-move-hint {
+	margin-top: -8px;
+	margin-bottom: 8px;
+	font-size: 12px;
+	opacity: 0.7;
+	display: flex;
+	align-items: center;
+}
+.tw-move-hint .v-icon {
+	opacity: 0.7;
 }
 </style>
