@@ -25,7 +25,7 @@
 					v-model="text"
 					type="text"
 					class="tw-reschedule__input"
-					placeholder="tomorrow, +3d, mon…"
+					placeholder="tomorrow, mañana, +3d, próximo lunes…"
 					autocomplete="off"
 					spellcheck="false"
 					aria-label="Reschedule date"

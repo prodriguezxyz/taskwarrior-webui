@@ -80,11 +80,12 @@
 					<kbd>@</kbd>tag
 					<kbd>p1-p4</kbd>
 					<kbd>today</kbd>
-					<kbd>tomorrow</kbd>
-					<kbd>monday</kbd>
+					<kbd>mañana</kbd>
+					<kbd>lunes</kbd>
 					<kbd>next mon</kbd>
 					<kbd>+3d</kbd>
 					<kbd>eow</kbd>
+					<kbd>a las 5</kbd>
 					<kbd>3pm</kbd>
 					<kbd>15:00</kbd>
 				</span>
@@ -104,7 +105,17 @@ import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxt
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
-import { dayIndexOf, parseDateToken, parseTimeToken, combineDateTime } from '../utils/dateParse';
+import {
+	deaccent,
+	mergeDatePhrases,
+	parseDateToken,
+	parseTimeToken,
+	parseBareHour,
+	isTimeLike,
+	dayPartOf,
+	applyDayPart,
+	combineDateTime
+} from '../utils/dateParse';
 
 const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
 	'1': 'H',
@@ -121,26 +132,16 @@ interface Parsed {
 	due?: string;
 }
 
-function parseQuickAdd(input: string): Parsed {
-	const out: Parsed = { description: '', tags: [] };
-	const raw = input.split(/\s+/).filter(Boolean);
-
-	// Merge "next <day|week|month>" and "this <day>" into one token so parseDateToken can handle them.
+// Merges date phrases (shared with the reschedule popover via mergeDatePhrases), then
+// joins clock times split across tokens ("3 pm" -> "3pm"). The time merge is quick-add
+// only; "a las"/"at" prepositions are handled in the main loop, not here.
+function mergePhrases(raw: string[]): string[] {
+	const dated = mergeDatePhrases(raw);
 	const tokens: string[] = [];
-	for (let i = 0; i < raw.length; i++) {
-		const cur = raw[i];
+	for (let i = 0; i < dated.length; i++) {
+		const cur = dated[i];
 		const lower = cur.toLowerCase();
-		const peek = raw[i + 1]?.toLowerCase();
-		if ((lower === 'next' || lower === 'this') && peek) {
-			const isDay = dayIndexOf(peek) !== -1;
-			const isPeriod = lower === 'next' && (peek === 'week' || peek === 'month');
-			if (isDay || isPeriod) {
-				tokens.push(`${lower}${peek}`);
-				i++;
-				continue;
-			}
-		}
-		// Merge a clock time split across tokens: "3 pm" -> "3pm", "9:30 am" -> "9:30am".
+		const peek = dated[i + 1]?.toLowerCase();
 		if (/^\d{1,2}(:\d{2})?$/.test(lower) && (peek === 'am' || peek === 'pm')) {
 			tokens.push(`${lower}${peek}`);
 			i++;
@@ -148,39 +149,83 @@ function parseQuickAdd(input: string): Parsed {
 		}
 		tokens.push(cur);
 	}
+	return tokens;
+}
+
+function parseQuickAdd(input: string): Parsed {
+	const out: Parsed = { description: '', tags: [] };
+	const tokens = mergePhrases(input.split(/\s+/).filter(Boolean));
 
 	const remaining: string[] = [];
 	let dueDate: string | undefined;
 	let dueTime: { hours: number; minutes: number } | undefined;
 
-	for (const tok of tokens) {
-		if (!tok) continue;
+	let i = 0;
+	while (i < tokens.length) {
+		const tok = tokens[i];
+		const lower = tok.toLowerCase();
+		const plain = deaccent(lower);
+
 		const proj = /^#([\p{L}\p{N}_.-]+)$/u.exec(tok);
 		if (proj) {
 			out.project = proj[1];
+			i++;
 			continue;
 		}
 		const tag = /^@([\p{L}\p{N}_-]+)$/u.exec(tok);
 		if (tag) {
 			if (!out.tags.includes(tag[1])) out.tags.push(tag[1]);
+			i++;
 			continue;
 		}
 		const pri = /^p([1-4])$/i.exec(tok);
 		if (pri) {
 			out.priority = PRIORITY_MAP[pri[1]];
+			i++;
 			continue;
 		}
-		const date = parseDateToken(tok);
+
+		// Time preposition: "at <time>", "a las <time>", "a la <time>". Only consumed when
+		// a time actually follows, so plain prose ("voy a la tienda") keeps its words. This
+		// is what lets a bare hour like "a las 5" register — parseBareHour accepts the marker-
+		// less number once the preposition vouches for it.
+		const next = tokens[i + 1]?.toLowerCase();
+		if (lower === 'at' && isTimeLike(tokens[i + 1])) {
+			dueTime = parseTimeToken(tokens[i + 1]) ?? parseBareHour(tokens[i + 1]);
+			i += 2;
+			continue;
+		}
+		if (lower === 'a' && (next === 'las' || next === 'la') && isTimeLike(tokens[i + 2])) {
+			dueTime = parseTimeToken(tokens[i + 2]) ?? parseBareHour(tokens[i + 2]);
+			i += 3;
+			continue;
+		}
+
+		// Daypart phrase "de/por la <mañana|tarde|noche|madrugada>": shifts an already-parsed
+		// time (5 -> 17 for "de la tarde"). With no time yet it's just prose — keep the words
+		// verbatim so "mañana" inside it isn't mistaken for tomorrow.
+		if ((plain === 'de' || plain === 'por') && deaccent(next ?? '') === 'la' && dayPartOf(tokens[i + 2])) {
+			if (dueTime) dueTime = applyDayPart(dueTime, dayPartOf(tokens[i + 2])!);
+			else remaining.push(tok, tokens[i + 1], tokens[i + 2]);
+			i += 3;
+			continue;
+		}
+
+		const date = parseDateToken(lower);
 		if (date) {
 			dueDate = date;
+			i++;
 			continue;
 		}
-		const time = parseTimeToken(tok);
+		const time = parseTimeToken(lower);
 		if (time) {
 			dueTime = time;
+			i++;
 			continue;
 		}
+
 		remaining.push(tok);
+		i++;
 	}
 
 	// A bare time ("3pm") with no day attaches to today; "tomorrow 3pm" combines both.
