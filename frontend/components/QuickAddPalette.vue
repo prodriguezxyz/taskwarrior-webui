@@ -32,7 +32,7 @@
 			<div v-if="suggestions.length" class="tw-palette__results" role="listbox">
 				<button
 					v-for="(s, i) in suggestions"
-					:key="s"
+					:key="suggestionKey(s)"
 					type="button"
 					role="option"
 					:aria-selected="i === activeIdx"
@@ -44,7 +44,8 @@
 					<v-icon size="14" class="tw-palette__item-icon" aria-hidden="true">
 						{{ suggestionType === 'project' ? 'mdi-folder-outline' : 'mdi-tag-outline' }}
 					</v-icon>
-					<span class="tw-palette__item-desc">{{ s }}</span>
+					<span class="tw-palette__item-desc">{{ s.text }}</span>
+					<span v-if="s.profile" class="tw-palette__item-profile">{{ s.profile }}</span>
 				</button>
 			</div>
 
@@ -52,6 +53,10 @@
 				<span v-if="parsed.project" class="tw-quickadd__chip">
 					<v-icon size="12" aria-hidden="true">mdi-folder-outline</v-icon>
 					{{ parsed.project }}
+				</span>
+				<span v-if="projectTargetProfile && projectTargetProfile !== activeProfile" class="tw-quickadd__chip">
+					<v-icon size="12" aria-hidden="true">mdi-account-switch-outline</v-icon>
+					{{ projectTargetProfile }}
 				</span>
 				<span
 					v-for="t in parsed.tags"
@@ -130,6 +135,11 @@ interface Parsed {
 	tags: string[];
 	priority?: 'H' | 'M' | 'L';
 	due?: string;
+}
+
+interface Suggestion {
+	text: string;
+	profile?: string;
 }
 
 // Merges date phrases (shared with the reschedule popover via mergeDatePhrases), then
@@ -265,17 +275,39 @@ export default defineComponent({
 		const activeIdx = ref(0);
 		const submitting = ref(false);
 		const inputRef = ref<HTMLInputElement | null>(null);
+		const selectedProject = ref<{ project: string, profile: string } | null>(null);
+		const activeProfile = computed(() => store.state.settings.profile);
 
-		// Suggestions are scoped to the active profile in multi-profile mode so
-		// projects/tags from other profiles don't leak into the picker (and don't
-		// confuse the user into committing a project that won't exist where the
-		// task actually lands).
-		const projects = computed(() => {
-			const set = new Set<string>();
-			for (const t of store.getters.ownTasks as Task[]) {
-				if (t.project) set.add(t.project);
+		const projectSuggestions = computed((): Suggestion[] => {
+			const seen = new Set<string>();
+			const byProfile = new Map<string, Set<string>>();
+			for (const t of store.state.tasks as TaskWithProfile[]) {
+				if (!t.project) continue;
+				const profile = t._profile || activeProfile.value;
+				if (!byProfile.has(profile)) byProfile.set(profile, new Set());
+				byProfile.get(profile)!.add(t.project);
 			}
-			return Array.from(set).sort();
+			const order = store.getters.multiProfile
+				? [
+					activeProfile.value,
+					...store.state.profiles.map(p => p.name).filter(n => n !== activeProfile.value)
+				]
+				: [activeProfile.value];
+			const items: Suggestion[] = [];
+			for (const profile of order) {
+				const projects = byProfile.get(profile);
+				if (!projects) continue;
+				for (const project of Array.from(projects).sort()) {
+					const key = `${profile}::${project}`;
+					if (seen.has(key)) continue;
+					seen.add(key);
+					items.push({
+						text: project,
+						profile: store.getters.multiProfile ? profile : undefined
+					});
+				}
+			}
+			return items;
 		});
 
 		const tags = computed(() => {
@@ -304,23 +336,42 @@ export default defineComponent({
 			return t.sigil === '#' ? 'project' : 'tag';
 		});
 
-		const suggestions = computed((): string[] => {
+		const suggestions = computed((): Suggestion[] => {
 			const t = currentToken.value;
 			if (!t) return [];
-			const list = t.sigil === '#' ? projects.value : tags.value;
+			const list = t.sigil === '#'
+				? projectSuggestions.value
+				: tags.value.map(text => ({ text }));
 			const prefix = t.prefix.toLowerCase();
 			const parsed = parseQuickAdd(text.value);
 			const used = t.sigil === '@' ? new Set(parsed.tags) : new Set<string>();
 			return list
 				.filter(item => {
-					if (used.has(item)) return false;
+					if (used.has(item.text)) return false;
 					if (!prefix) return true;
-					return item.toLowerCase().includes(prefix);
+					return item.text.toLowerCase().includes(prefix);
 				})
 				.slice(0, 6);
 		});
 
 		const parsed = computed(() => parseQuickAdd(text.value));
+
+		const projectTargetProfile = computed(() => {
+			const project = parsed.value.project;
+			if (!project) return activeProfile.value || undefined;
+			if (
+				selectedProject.value
+				&& selectedProject.value.project.toLowerCase() === project.toLowerCase()
+			) return selectedProject.value.profile;
+
+			if (!store.getters.multiProfile) return activeProfile.value || undefined;
+			const matches = projectSuggestions.value
+				.filter(s => s.text.toLowerCase() === project.toLowerCase() && s.profile)
+				.map(s => s.profile as string);
+			if (matches.includes(activeProfile.value)) return activeProfile.value;
+			const unique = Array.from(new Set(matches));
+			return unique.length === 1 ? unique[0] : activeProfile.value || undefined;
+		});
 
 		const hasParsedMeta = computed(() =>
 			Boolean(parsed.value.project)
@@ -339,8 +390,17 @@ export default defineComponent({
 				cursorPos.value = 0;
 				activeIdx.value = 0;
 				submitting.value = false;
+				selectedProject.value = null;
 				await nextTick();
 				inputRef.value?.focus();
+			}
+		});
+
+		watch(text, () => {
+			const project = parseQuickAdd(text.value).project;
+			if (!selectedProject.value) return;
+			if (!project || selectedProject.value.project.toLowerCase() !== project.toLowerCase()) {
+				selectedProject.value = null;
 			}
 		});
 
@@ -376,12 +436,17 @@ export default defineComponent({
 			submit();
 		};
 
-		const applySuggestion = (s: string) => {
+		const suggestionKey = (s: Suggestion) => `${s.profile || ''}::${s.text}`;
+
+		const applySuggestion = (s: Suggestion) => {
 			const t = currentToken.value;
 			if (!t) return;
 			const before = text.value.slice(0, t.start);
 			const after = text.value.slice(cursorPos.value);
-			const insert = `${t.sigil}${s} `;
+			const insert = `${t.sigil}${s.text} `;
+			if (t.sigil === '#' && s.profile) {
+				selectedProject.value = { project: s.text, profile: s.profile };
+			}
 			text.value = before + insert + after;
 			nextTick(() => {
 				const el = inputRef.value;
@@ -398,11 +463,10 @@ export default defineComponent({
 			const p = parsed.value;
 			if (!p.description) return;
 			submitting.value = true;
-			// Route the write to the active profile. Without this the backend
-			// falls back to the user's first allowed profile, which can differ
-			// from the one the user is looking at.
+			// Route the write explicitly; otherwise the backend falls back to the
+			// user's first allowed profile, which can differ from the intended one.
 			const payload: TaskWithProfile = {
-				_profile: store.state.settings.profile || undefined,
+				_profile: projectTargetProfile.value || activeProfile.value || undefined,
 				description: p.description,
 				project: p.project,
 				tags: p.tags.length ? p.tags : undefined,
@@ -437,8 +501,11 @@ export default defineComponent({
 			inputRef,
 			suggestions,
 			suggestionType,
+			suggestionKey,
 			activeIdx,
 			parsed,
+			activeProfile,
+			projectTargetProfile,
 			hasParsedMeta,
 			displayDate,
 			close,

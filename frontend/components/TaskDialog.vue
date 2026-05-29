@@ -333,6 +333,18 @@ export default defineComponent({
 			return substring[0] || null;
 		};
 
+		const exactProjectMatch = (val: string) => {
+			if (!multiProfile.value) return null;
+			const lower = val.toLowerCase();
+			const matches = (projectItems.value as any[])
+				.filter(item => item && item.project && item.project.toLowerCase() === lower);
+			if (!matches.length) return null;
+			const current = matches.find(item => item.profile === contextProfile.value);
+			if (current) return current;
+			const profiles = Array.from(new Set(matches.map(item => item.profile)));
+			return profiles.length === 1 ? matches[0] : null;
+		};
+
 		const onProjectChange = (val: any) => {
 			if (val && typeof val === 'object') {
 				// Picked an existing project item; it may live in another profile,
@@ -343,13 +355,14 @@ export default defineComponent({
 				projectSearch.value = val.text;
 			}
 			else {
-				// Free text (or cleared) → new/existing project in the CURRENT
-				// profile. bestMatch remaps a prefix ("auto" → "automation").
+				// Free text (or cleared): exact unique cross-profile project names
+				// route there; otherwise new/existing projects stay in context.
 				const str = val ? String(val) : '';
-				const candidate = str ? bestMatch(str, projects.value as string[]) : null;
-				const finalProj = candidate || str;
+				const exact = str ? exactProjectMatch(str) : null;
+				const candidate = !exact && str ? bestMatch(str, projects.value as string[]) : null;
+				const finalProj = exact ? exact.project : (candidate || str);
 				formData.value.project = finalProj;
-				targetProfile.value = contextProfile.value;
+				targetProfile.value = exact?.profile || contextProfile.value;
 				projectModel.value = finalProj;
 				projectSearch.value = finalProj;
 			}
