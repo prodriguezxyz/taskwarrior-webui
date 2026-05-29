@@ -6,6 +6,7 @@ import * as qs from 'koa-qs';
 
 import tasksRouter from './tasks';
 import syncRouter from './sync';
+import calendarRouter from './calendar';
 import { profilesRouter, getProfile, hasProfile } from './profiles';
 import { authMiddleware, authRouter, authMode } from './auth';
 import { TaskError } from 'taskwarrior-lib';
@@ -61,6 +62,7 @@ app.use(async (ctx, next) => {
 const router = new Router();
 router.use('/tasks', tasksRouter.routes());
 router.use('/sync', syncRouter.routes());
+router.use('/calendar', calendarRouter.routes());
 router.use('/profiles', profilesRouter.routes());
 router.use('/auth', authRouter.routes());
 

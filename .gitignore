@@ -3,6 +3,7 @@
 dist
 
 # deploy
+.env
 .deploy.env
 tw.tar.gz
 

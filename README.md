@@ -75,6 +75,14 @@ Environment variables read by the backend:
 | `CF_ACCESS_TEAM_DOMAIN` | — | Required when `AUTH_MODE=cloudflare` |
 | `CF_ACCESS_AUD` | — | Required when `AUTH_MODE=cloudflare` |
 | `DEV_USER_EMAIL` | `dev@localhost` | Email injected as the request user in `dev` mode |
+| `CALDAV_ENABLED` | `false` | Set to `true`/`1` to mirror timed tasks into a CalDAV calendar |
+| `CALDAV_BASE_URL` | — | Calendar collection URL, e.g. `https://radicale.example/user/tasks/` |
+| `CALDAV_USERNAME` | — | Optional basic-auth username for CalDAV |
+| `CALDAV_PASSWORD` | — | Optional basic-auth password for CalDAV |
+| `CALDAV_ALARM_TRIGGER` | `-PT10M` | iCalendar alarm trigger for mirrored events |
+| `CALDAV_EVENT_DURATION_MINUTES` | `15` | Duration assigned to generated calendar events |
+| `CALDAV_TIMEZONE` | `TZ` or `Europe/Madrid` | Time zone used to distinguish timed values from date-only midnight deadlines |
+| `CALDAV_REQUEST_TIMEOUT_MS` | `5000` | Timeout for each CalDAV `PUT`/`DELETE` request |
 
 When `TASKRC` or `TASKDATA` is changed, mount the files at the matching paths inside the container.
 
@@ -102,6 +110,21 @@ docker run -d -p 8080:80 --name taskwarrior-webui \
 ```
 
 A profile selector appears in the top bar whenever two or more profiles are defined. If `PROFILES_CONFIG` points to a missing file, the UI falls back to a single default profile using `TASKRC` and `TASKDATA`.
+
+### CalDAV task alerts
+
+The backend can mirror timed Taskwarrior tasks into a CalDAV calendar, such as Radicale, as `VEVENT` entries with a `VALARM`. Taskwarrior remains the source of truth; calendar entries are only a projection for calendar views and client-side reminders.
+
+Mirroring is enabled only when `CALDAV_ENABLED` is truthy and `CALDAV_BASE_URL` points at a calendar collection. A pending task is mirrored when it has `scheduled` with a non-midnight time; if not, `due` with a non-midnight time is used. Date-only values are ignored so ordinary deadlines do not become noisy reminders. Completed, deleted, waiting without a timed reminder, or untimed tasks remove their generated event.
+
+Generated event UIDs are stable: `taskwarrior-{profile}-{uuid}`. The same UID is also used as the `.ics` resource filename under `CALDAV_BASE_URL`, so updates are idempotent across repeated writes and task syncs.
+
+To repair the calendar projection manually:
+
+```sh
+curl -X POST http://localhost:3000/calendar/reconcile
+curl -X POST http://localhost:3000/calendar/reconcile/all
+```
 
 ### Authentication
 
