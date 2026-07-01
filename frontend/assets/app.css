@@ -338,6 +338,10 @@ button.tw-icon-btn:focus-visible {
 	color: var(--tw-st-today) !important;
 }
 
+.v-icon.tw-page__icon--calendar {
+	color: var(--tw-accent) !important;
+}
+
 .v-icon.tw-page__icon--mine {
 	color: var(--tw-st-pending) !important;
 }
@@ -708,6 +712,19 @@ button.tw-icon-btn:focus-visible {
 .tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__icon--today,
 .tw-sidebar__item--today.tw-sidebar__item--active .tw-sidebar__count--today {
 	color: var(--tw-st-today) !important;
+}
+
+/* Calendar entry — accent tone, separate from due-today orange */
+.tw-sidebar__icon--calendar { color: var(--tw-accent) !important; }
+.tw-sidebar__count--calendar { color: var(--tw-accent); }
+.tw-sidebar__item--calendar.tw-sidebar__item--active,
+.tw-sidebar__item--calendar.tw-sidebar__item--active:hover {
+	background: var(--tw-accent-soft);
+	color: var(--tw-accent);
+}
+.tw-sidebar__item--calendar.tw-sidebar__item--active .tw-sidebar__icon--calendar,
+.tw-sidebar__item--calendar.tw-sidebar__item--active .tw-sidebar__count--calendar {
+	color: var(--tw-accent) !important;
 }
 
 /* Mine entry — blue tone, mirrors Today's pattern */

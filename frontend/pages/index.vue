@@ -13,7 +13,8 @@
 			</header>
 		</div>
 
-		<TagsIndex v-if="view === 'tags'" />
+		<CalendarView v-if="view === 'calendar'" :tasks="tasks" />
+		<TagsIndex v-else-if="view === 'tags'" />
 		<ProjectsIndex v-else-if="view === 'projects'" />
 		<TaskList v-else :tasks="tasks" />
 	</div>
@@ -23,11 +24,13 @@
 import { defineComponent, computed, watch, ComputedRef, useStore, useContext } from '@nuxtjs/composition-api';
 import moment from 'moment';
 import TaskList from '../components/TaskList.vue';
+import CalendarView from '../components/CalendarView.vue';
 import TagsIndex from '../components/TagsIndex.vue';
 import ProjectsIndex from '../components/ProjectsIndex.vue';
 import { Task } from 'taskwarrior-lib';
 import { accessorType } from '../store';
 import { collapseRecurring } from '../utils/collapse';
+import { calendarTaskItems } from '../utils/calendar';
 
 export default defineComponent({
 	setup() {
@@ -82,6 +85,7 @@ export default defineComponent({
 
 		const pageTitle = computed(() => {
 			if (view.value === 'today') return 'Today';
+			if (view.value === 'calendar') return 'Calendar';
 			if (view.value === 'mine') return 'Assigned to me';
 			if (view.value === 'tags') return 'Tags';
 			if (view.value === 'projects') return 'Projects';
@@ -92,6 +96,7 @@ export default defineComponent({
 
 		const pageIcon = computed(() => {
 			if (view.value === 'today') return 'mdi-calendar-today';
+			if (view.value === 'calendar') return 'mdi-calendar-month-outline';
 			if (view.value === 'mine') return 'mdi-account-outline';
 			if (view.value === 'tags') return 'mdi-tag-multiple-outline';
 			if (view.value === 'projects') return 'mdi-folder-multiple-outline';
@@ -102,6 +107,7 @@ export default defineComponent({
 
 		const pageIconTone = computed(() => {
 			if (view.value === 'today') return 'tw-page__icon--today';
+			if (view.value === 'calendar') return 'tw-page__icon--calendar';
 			if (view.value === 'mine') return 'tw-page__icon--mine';
 			if (view.value === 'tags') return 'tw-page__icon--tag';
 			if (view.value === 'projects') return '';
@@ -124,6 +130,10 @@ export default defineComponent({
 					return !waiting && t.due && moment(t.due).isSameOrBefore(endOfToday);
 				});
 				return collapseRecurring(todayList).length;
+			}
+			if (view.value === 'calendar') {
+				const scoped = store.state.tasks.filter((t: Task) => store.getters.inCalendarScope(t));
+				return calendarTaskItems(scoped).length;
 			}
 			if (view.value === 'mine') {
 				const me = store.state.user?.email;
@@ -179,6 +189,7 @@ export default defineComponent({
 
 		return {
 			TaskList,
+			CalendarView,
 			TagsIndex,
 			ProjectsIndex,
 			tasks,

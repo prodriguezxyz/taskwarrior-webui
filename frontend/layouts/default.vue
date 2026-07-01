@@ -151,6 +151,17 @@
 				</button>
 
 				<button
+					type="button"
+					class="tw-sidebar__item tw-sidebar__item--calendar"
+					:class="{ 'tw-sidebar__item--active': view === 'calendar' }"
+					@click="selectCalendar"
+				>
+					<v-icon size="16" class="tw-sidebar__icon tw-sidebar__icon--calendar" aria-hidden="true">mdi-calendar-month-outline</v-icon>
+					<span class="tw-sidebar__label">Calendar</span>
+					<span v-if="calendarCount > 0" class="tw-sidebar__count tw-sidebar__count--calendar">{{ calendarCount }}</span>
+				</button>
+
+				<button
 					v-if="hasMembers"
 					type="button"
 					class="tw-sidebar__item tw-sidebar__item--mine"
@@ -250,6 +261,7 @@ import ProjectManageDialog from '../components/ProjectManageDialog.vue';
 import ShortcutsHelp from '../components/ShortcutsHelp.vue';
 import { accessorType } from '../store';
 import { collapseRecurring } from '../utils/collapse';
+import { calendarTaskItems } from '../utils/calendar';
 
 export default defineComponent({
 	setup(_props, _ctx) {
@@ -311,6 +323,11 @@ export default defineComponent({
 			return collapseRecurring(todayList).length;
 		});
 
+		const calendarCount = computed(() => {
+			const scoped = pendingTasks.value.filter((t: any) => store.getters.inCalendarScope(t));
+			return calendarTaskItems(scoped).length;
+		});
+
 		const hasMembers = computed(() => store.state.members.length > 1);
 
 		const mineCount = computed(() => {
@@ -351,6 +368,7 @@ export default defineComponent({
 		const setProject = (name: string | null) => selectView('all', name);
 		const selectInbox = () => selectView('all');
 		const selectToday = () => selectView('today');
+		const selectCalendar = () => selectView('calendar');
 		const selectMine = () => selectView('mine');
 		const selectTagsIndex = () => selectView('tags');
 		const selectProjectsIndex = () => selectView('projects');
@@ -477,6 +495,7 @@ export default defineComponent({
 				switch (e.key.toLowerCase()) {
 					case 'i': e.preventDefault(); selectInbox(); return;
 					case 't': e.preventDefault(); selectToday(); return;
+					case 'c': e.preventDefault(); selectCalendar(); return;
 					case 'p': e.preventDefault(); selectProjectsIndex(); return;
 					case 'g': e.preventDefault(); selectTagsIndex(); return;
 				}
@@ -574,6 +593,7 @@ export default defineComponent({
 			view,
 			totalPending,
 			todayCount,
+			calendarCount,
 			hasMembers,
 			mineCount,
 			projectList,
@@ -581,6 +601,7 @@ export default defineComponent({
 			setProject,
 			selectInbox,
 			selectToday,
+			selectCalendar,
 			selectMine,
 			selectTagsIndex,
 			selectProjectsIndex,

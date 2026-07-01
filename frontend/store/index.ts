@@ -3,8 +3,8 @@ import { Task } from 'taskwarrior-lib';
 import { getAccessorType } from 'typed-vuex';
 
 export type TaskWithProfile = Task & { _profile?: string };
-export type ViewName = 'all' | 'today' | 'tags' | 'projects' | 'mine';
-export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'mine']);
+export type ViewName = 'all' | 'today' | 'calendar' | 'tags' | 'projects' | 'mine';
+export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'calendar', 'mine']);
 export function isCrossProfileView(view: ViewName): boolean {
 	return CROSS_PROFILE_VIEWS.has(view);
 }
@@ -27,6 +27,7 @@ export const state = () => ({
 		// Today view: 'mine' shows tasks assigned to me or unassigned; 'all'
 		// shows everything (useful in shared profiles to see what others have).
 		todayScope: 'mine' as 'mine' | 'all',
+		calendarScope: 'mine' as 'mine' | 'all',
 		// Tags hidden from the row display (still indexed/searchable). Default
 		// covers the bulk "imported" tag a user is likely carrying around.
 		hiddenTags: ['todoist-import'] as string[]
@@ -92,6 +93,16 @@ export const getters: GetterTree<RootState, RootState> = {
 	// view, the sidebar count, and the page header count.
 	inTodayScope: (state) => (task: Task): boolean => {
 		if (state.settings.todayScope === 'all') return true;
+		const a = (task as any).assignee;
+		if (!a) return true;
+		const me = state.user?.email;
+		return !!me && a === me;
+	},
+	// Calendar scope is intentionally independent from Today scope. Both use
+	// the same ownership rule for "mine", but changing one view must not alter
+	// the other.
+	inCalendarScope: (state) => (task: Task): boolean => {
+		if (state.settings.calendarScope === 'all') return true;
 		const a = (task as any).assignee;
 		if (!a) return true;
 		const me = state.user?.email;

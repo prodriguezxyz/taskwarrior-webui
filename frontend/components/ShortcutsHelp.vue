@@ -69,6 +69,7 @@ export default defineComponent({
 				items: [
 					{ label: 'Inbox', keys: ['g', 'i'], join: 'then' },
 					{ label: 'Today', keys: ['g', 't'], join: 'then' },
+					{ label: 'Calendar', keys: ['g', 'c'], join: 'then' },
 					{ label: 'Projects', keys: ['g', 'p'], join: 'then' },
 					{ label: 'Tags', keys: ['g', 'g'], join: 'then' }
 				]
