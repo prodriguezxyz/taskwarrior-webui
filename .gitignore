@@ -12,3 +12,6 @@ tw.tar.gz
 *-import.json
 todoist-dump.json
 todoist-fresh.json
+
+# local agent/runtime state
+.claude/scheduled_tasks.lock
