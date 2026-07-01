@@ -149,6 +149,17 @@
 			</v-card-text>
 
 			<v-card-actions>
+				<v-btn
+					v-if="canComplete"
+					text
+					color="success"
+					class="text-none tw-complete-task"
+					title="Mark as done"
+					@click="completeTask"
+				>
+					<v-icon left small>mdi-check</v-icon>
+					Complete
+				</v-btn>
 				<v-spacer />
 				<v-btn text @click="closeDialog" width="80px">
 					Cancel
@@ -206,6 +217,9 @@ export default defineComponent({
 			if (!willMove.value) return 'Submit';
 			return props.task ? `Move to ${targetProfile.value}` : `Add to ${targetProfile.value}`;
 		});
+		const canComplete = computed(() =>
+			Boolean(props.task && props.task.status === 'pending')
+		);
 
 		const inContext = (t: Task) =>
 			!store.getters.multiProfile
@@ -453,6 +467,41 @@ export default defineComponent({
 			showDialog.value = false;
 			reset();
 		};
+
+		const undoTask = async (original: Task) => {
+			try {
+				await store.dispatch('updateTasks', [original]);
+			}
+			catch (err) {
+				store.commit('setNotification', { color: 'error', text: 'Failed to undo' });
+			}
+		};
+
+		const completeTask = async () => {
+			if (!props.task || !canComplete.value) return;
+			const original = JSON.parse(JSON.stringify(props.task));
+			try {
+				await store.dispatch('updateTasks', [{
+					...props.task,
+					status: 'completed'
+				}]);
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Failed to complete task'
+				});
+				return;
+			}
+			store.commit('setNotification', {
+				color: 'success',
+				text: 'Task completed',
+				actionText: 'Undo',
+				actionHandler: () => undoTask(original)
+			});
+			closeDialog();
+		};
+
 		const submit = async () => {
 			const valid = (formRef.value as any).validate();
 			if (!valid) return;
@@ -536,6 +585,7 @@ export default defineComponent({
 			willMove,
 			moveHint,
 			submitLabel,
+			canComplete,
 			memberItems,
 			priorities,
 			recur,
@@ -543,6 +593,7 @@ export default defineComponent({
 			addAnnotationDescription,
 			addAnnotation,
 			closeDialog,
+			completeTask,
 			submit,
 			showDialog,
 			projectSearch,
