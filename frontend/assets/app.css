@@ -295,6 +295,19 @@ button.tw-icon-btn:focus-visible {
 	padding: 24px 20px 12px;
 }
 
+.tw-page--wide {
+	max-width: none;
+	padding-left: 28px;
+	padding-right: 28px;
+}
+
+@media (max-width: 640px) {
+	.tw-page--wide {
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+}
+
 .tw-page__header {
 	display: flex;
 	align-items: center;

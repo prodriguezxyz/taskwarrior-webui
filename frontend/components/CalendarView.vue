@@ -279,9 +279,10 @@ export default defineComponent({
 
 <style scoped>
 .tw-calendar {
-	max-width: 1400px;
+	width: 100%;
+	max-width: none;
 	margin: 0 auto;
-	padding: 0 20px 28px;
+	padding: 0 28px 28px;
 }
 
 .tw-calendar__toolbar {
@@ -310,8 +311,8 @@ export default defineComponent({
 
 .tw-calendar__layout {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) 320px;
-	gap: 16px;
+	grid-template-columns: minmax(0, 1fr) minmax(320px, 18vw);
+	gap: 18px;
 	align-items: start;
 }
 
@@ -325,7 +326,7 @@ export default defineComponent({
 }
 
 .tw-calendar__weekday {
-	padding: 9px 10px;
+	padding: 10px 12px;
 	font-size: 11px;
 	font-weight: 600;
 	text-transform: uppercase;
@@ -342,8 +343,8 @@ export default defineComponent({
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	min-height: 118px;
-	padding: 8px;
+	min-height: clamp(118px, calc((100vh - 265px) / 6), 156px);
+	padding: 10px;
 	text-align: left;
 	border: 0;
 	border-top: 1px solid var(--tw-border);
@@ -383,7 +384,7 @@ export default defineComponent({
 	border-radius: 999px;
 	font-size: 12px;
 	font-weight: 600;
-	margin-bottom: 5px;
+	margin-bottom: 7px;
 }
 
 .tw-calendar__day--today .tw-calendar__date {
@@ -394,18 +395,18 @@ export default defineComponent({
 .tw-calendar__items {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 5px;
 	min-width: 0;
 }
 
 .tw-calendar__pill {
 	display: block;
-	min-height: 20px;
-	padding: 2px 6px;
+	min-height: 22px;
+	padding: 3px 7px;
 	border-radius: 5px;
 	background: var(--tw-accent-soft);
 	color: var(--tw-accent);
-	font-size: 11px;
+	font-size: 12px;
 	line-height: 16px;
 	white-space: nowrap;
 	overflow: hidden;
@@ -423,7 +424,7 @@ export default defineComponent({
 }
 
 .tw-calendar__more {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--tw-text-muted);
 	padding-left: 2px;
 }
@@ -432,20 +433,23 @@ export default defineComponent({
 	border: 1px solid var(--tw-border);
 	border-radius: 8px;
 	background: var(--tw-surface);
-	overflow: hidden;
+	overflow: auto;
+	position: sticky;
+	top: 72px;
+	max-height: calc(100vh - 96px);
 }
 
 .tw-calendar__agenda-head {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 14px 16px;
+	padding: 16px 18px;
 	border-bottom: 1px solid var(--tw-border);
 	background: var(--tw-surface);
 }
 
 .tw-calendar__agenda-label {
-	font-size: 14px;
+	font-size: 15px;
 	font-weight: 600;
 	color: var(--tw-text);
 }
@@ -463,9 +467,9 @@ export default defineComponent({
 
 .tw-calendar__agenda-item {
 	display: grid;
-	grid-template-columns: 58px minmax(0, 1fr);
-	gap: 10px;
-	padding: 12px 14px;
+	grid-template-columns: 64px minmax(0, 1fr);
+	gap: 12px;
+	padding: 14px 16px;
 	border: 0;
 	border-bottom: 1px solid var(--tw-border);
 	background: transparent;
@@ -493,7 +497,7 @@ export default defineComponent({
 
 .tw-calendar__agenda-title {
 	display: block;
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--tw-text);
 	overflow: hidden;
@@ -538,6 +542,11 @@ export default defineComponent({
 
 	.tw-calendar__layout {
 		grid-template-columns: 1fr;
+	}
+
+	.tw-calendar__agenda {
+		position: static;
+		max-height: none;
 	}
 
 	.tw-calendar__day {

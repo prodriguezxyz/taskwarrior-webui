@@ -1,6 +1,6 @@
 <template>
 	<div>
-		<div class="tw-page">
+		<div class="tw-page" :class="{ 'tw-page--wide': view === 'calendar' }">
 			<header class="tw-page__header">
 				<h1 class="tw-page__title">
 					<v-icon size="22" :class="['tw-page__icon', pageIconTone]">{{ pageIcon }}</v-icon>
