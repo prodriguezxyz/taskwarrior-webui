@@ -25,7 +25,7 @@
 					v-model="text"
 					type="text"
 					class="tw-reschedule__input"
-					placeholder="tomorrow, mañana, +3d, próximo lunes…"
+					placeholder="mañana 15:00, en 15 días a las 5…"
 					autocomplete="off"
 					spellcheck="false"
 					aria-label="Reschedule date"
@@ -69,7 +69,13 @@
 import { defineComponent, computed, ref, watch, nextTick, onBeforeUnmount, PropType } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
-import { parseDateInput, dayOfWeekFrom } from '../utils/dateParse';
+import {
+	combineDateTime,
+	datePartFromDue,
+	dayOfWeekFrom,
+	parseDateTimeInput,
+	timePartFromDue
+} from '../utils/dateParse';
 
 interface Preset {
 	label: string;
@@ -108,6 +114,8 @@ export default defineComponent({
 		const text = ref('');
 		const inputRef = ref<HTMLInputElement | null>(null);
 		const presetRefs = ref<HTMLButtonElement[]>([]);
+		const existingDate = computed(() => datePartFromDue(props.task?.due));
+		const existingTime = computed(() => timePartFromDue(props.task?.due));
 
 		const presets = computed<Preset[]>(() => [
 			{ label: 'Today', hint: shortLabel(todayStr()), value: todayStr() },
@@ -117,11 +125,19 @@ export default defineComponent({
 			{ label: 'No date', hint: '—', value: undefined }
 		]);
 
-		const parsed = computed(() => parseDateInput(text.value));
+		const parsed = computed(() => parseDateTimeInput(text.value, existingDate.value, existingTime.value)?.due);
 		const parsedLabel = computed(() => {
 			if (!parsed.value) return '';
-			return moment(parsed.value).format('dddd, MMM D');
+			const m = moment(parsed.value);
+			return /T\d{2}:\d{2}/.test(parsed.value)
+				? m.format('dddd, MMM D HH:mm')
+				: m.format('dddd, MMM D');
 		});
+
+		const preserveExistingTime = (due: string | undefined) => {
+			if (!due || /T\d{2}:\d{2}/.test(due)) return due;
+			return existingTime.value ? combineDateTime(due, existingTime.value) : due;
+		};
 
 		const close = () => {
 			open.value = false;
@@ -131,7 +147,7 @@ export default defineComponent({
 			if (!props.task) {
 				close(); return;
 			}
-			ctx.emit('apply', { task: props.task, due });
+			ctx.emit('apply', { task: props.task, due: preserveExistingTime(due) });
 			close();
 		};
 

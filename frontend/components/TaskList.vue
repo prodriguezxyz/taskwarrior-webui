@@ -412,10 +412,15 @@ function displayDate(str?: string) {
 		return date.format('YYYY-MM-DD');
 	}
 
-	const diff = moment.duration(date.diff(moment()));
-	if (Math.abs(diff.asDays()) < 1)
-		return diff.humanize(true);
-	return date.format('YYYY-MM-DD');
+	const today = moment().startOf('day');
+	const diffDays = date.clone().startOf('day').diff(today, 'days');
+	let label: string;
+	if (diffDays === 0) label = 'today';
+	else if (diffDays === 1) label = 'tomorrow';
+	else if (diffDays === -1) label = 'yesterday';
+	else if (diffDays > 1 && diffDays < 7) label = date.format('dddd');
+	else label = date.format('YYYY-MM-DD');
+	return `${label} ${date.format('HH:mm')}`;
 }
 
 function urgentDate(str?: string) {

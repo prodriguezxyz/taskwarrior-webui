@@ -88,6 +88,8 @@
 					<kbd>mañana</kbd>
 					<kbd>lunes</kbd>
 					<kbd>next mon</kbd>
+					<kbd>in 15 days</kbd>
+					<kbd>en 2 meses</kbd>
 					<kbd>+3d</kbd>
 					<kbd>eow</kbd>
 					<kbd>a las 5</kbd>
@@ -112,7 +114,7 @@ import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
 import {
 	deaccent,
-	mergeDatePhrases,
+	mergeDateTimePhrases,
 	parseDateToken,
 	parseTimeToken,
 	parseBareHour,
@@ -142,24 +144,10 @@ interface Suggestion {
 	profile?: string;
 }
 
-// Merges date phrases (shared with the reschedule popover via mergeDatePhrases), then
-// joins clock times split across tokens ("3 pm" -> "3pm"). The time merge is quick-add
-// only; "a las"/"at" prepositions are handled in the main loop, not here.
+// Merges date phrases and clock times split across tokens ("3 pm" -> "3pm").
+// "a las"/"at" prepositions are handled in the main loop, not here.
 function mergePhrases(raw: string[]): string[] {
-	const dated = mergeDatePhrases(raw);
-	const tokens: string[] = [];
-	for (let i = 0; i < dated.length; i++) {
-		const cur = dated[i];
-		const lower = cur.toLowerCase();
-		const peek = dated[i + 1]?.toLowerCase();
-		if (/^\d{1,2}(:\d{2})?$/.test(lower) && (peek === 'am' || peek === 'pm')) {
-			tokens.push(`${lower}${peek}`);
-			i++;
-			continue;
-		}
-		tokens.push(cur);
-	}
-	return tokens;
+	return mergeDateTimePhrases(raw);
 }
 
 function parseQuickAdd(input: string): Parsed {
