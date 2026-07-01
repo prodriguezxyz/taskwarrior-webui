@@ -28,6 +28,7 @@ export const state = () => ({
 		// shows everything (useful in shared profiles to see what others have).
 		todayScope: 'mine' as 'mine' | 'all',
 		calendarScope: 'mine' as 'mine' | 'all',
+		calendarViewMode: 'month' as 'month' | 'week',
 		// Tags hidden from the row display (still indexed/searchable). Default
 		// covers the bulk "imported" tag a user is likely carrying around.
 		hiddenTags: ['todoist-import'] as string[]

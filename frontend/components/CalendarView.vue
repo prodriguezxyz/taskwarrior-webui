@@ -5,9 +5,9 @@
 				<button
 					type="button"
 					class="tw-action tw-action--ghost"
-					title="Previous month"
-					aria-label="Previous month"
-					@click="previousMonth"
+					:title="previousLabel"
+					:aria-label="previousLabel"
+					@click="previousPeriod"
 				>
 					<v-icon size="18" aria-hidden="true">mdi-chevron-left</v-icon>
 				</button>
@@ -22,16 +22,35 @@
 				<button
 					type="button"
 					class="tw-action tw-action--ghost"
-					title="Next month"
-					aria-label="Next month"
-					@click="nextMonth"
+					:title="nextLabel"
+					:aria-label="nextLabel"
+					@click="nextPeriod"
 				>
 					<v-icon size="18" aria-hidden="true">mdi-chevron-right</v-icon>
 				</button>
-				<div class="tw-calendar__month">{{ monthLabel }}</div>
+				<div class="tw-calendar__period">{{ periodLabel }}</div>
 			</div>
 
 			<div class="tw-calendar__actions">
+				<nav
+					class="tw-tabs tw-calendar__mode"
+					role="tablist"
+					aria-label="Calendar view"
+				>
+					<button
+						v-for="opt in modeOptions"
+						:key="opt.value"
+						type="button"
+						role="tab"
+						:aria-selected="opt.value === calendarViewMode"
+						class="tw-tab"
+						:class="{ 'tw-tab--active': opt.value === calendarViewMode }"
+						@click="setCalendarViewMode(opt.value)"
+					>
+						<v-icon size="15" class="tw-tab__icon" aria-hidden="true">{{ opt.icon }}</v-icon>
+						<span class="tw-tab__label">{{ opt.label }}</span>
+					</button>
+				</nav>
 				<nav
 					v-if="hasMembers"
 					class="tw-tabs tw-calendar__scope"
@@ -65,7 +84,11 @@
 		</div>
 
 		<div class="tw-calendar__layout">
-			<section class="tw-calendar__grid" aria-label="Month calendar">
+			<section
+				class="tw-calendar__grid"
+				:class="{ 'tw-calendar__grid--week': calendarViewMode === 'week' }"
+				:aria-label="calendarViewMode === 'week' ? 'Week calendar' : 'Month calendar'"
+			>
 				<div
 					v-for="day in weekDays"
 					:key="day"
@@ -74,15 +97,18 @@
 					{{ day }}
 				</div>
 				<button
-					v-for="day in monthDays"
+					v-for="day in visibleDays"
 					:key="day.key"
 					type="button"
 					class="tw-calendar__day"
-					:class="{
-						'tw-calendar__day--outside': !day.inMonth,
-						'tw-calendar__day--today': day.isToday,
-						'tw-calendar__day--selected': day.key === selectedDayKey
-					}"
+					:class="[
+						{
+							'tw-calendar__day--outside': day.isOutside,
+							'tw-calendar__day--today': day.isToday,
+							'tw-calendar__day--selected': day.key === selectedDayKey
+						},
+						`tw-calendar__day--${calendarViewMode}`
+					]"
 					:aria-pressed="day.key === selectedDayKey"
 					@click="selectDay(day.key)"
 				>
@@ -152,6 +178,8 @@ import { accessorType, TaskWithProfile } from '../store';
 import { calendarTaskItems, CalendarTaskItem } from '../utils/calendar';
 
 type CalendarScope = 'mine' | 'all';
+type CalendarViewMode = 'month' | 'week';
+type CalendarOption<T extends string> = { value: T, label: string, icon: string };
 
 export default defineComponent({
 	props: {
@@ -164,16 +192,23 @@ export default defineComponent({
 	setup(props) {
 		const store = useStore<typeof accessorType>();
 		const context = useContext();
-		const currentMonth = ref(moment().startOf('month'));
 		const selectedDay = ref(moment().startOf('day'));
+		const currentPeriod = ref(selectedDay.value.clone().startOf('month'));
 
 		const calendarScope = computed<CalendarScope>(() =>
 			(store.state.settings as any).calendarScope || 'mine'
 		);
+		const calendarViewMode = computed<CalendarViewMode>(() =>
+			(store.state.settings as any).calendarViewMode === 'week' ? 'week' : 'month'
+		);
 		const hasMembers = computed(() => store.state.members.length > 1);
-		const scopeOptions: Array<{ value: CalendarScope, label: string, icon: string }> = [
+		const scopeOptions: Array<CalendarOption<CalendarScope>> = [
 			{ value: 'mine', label: 'Mine', icon: 'mdi-account-check-outline' },
 			{ value: 'all', label: 'All', icon: 'mdi-account-group-outline' }
+		];
+		const modeOptions: Array<CalendarOption<CalendarViewMode>> = [
+			{ value: 'month', label: 'Month', icon: 'mdi-calendar-month-outline' },
+			{ value: 'week', label: 'Week', icon: 'mdi-calendar-week-outline' }
 		];
 
 		const scopedTasks = computed(() => {
@@ -181,33 +216,51 @@ export default defineComponent({
 			return tasks.filter(task => store.getters.inCalendarScope(task));
 		});
 		const items = computed(() => calendarTaskItems(scopedTasks.value));
-		const visibleItemLimit = computed(() => context.$vuetify.breakpoint.xsOnly ? 1 : 3);
+		const visibleItemLimit = computed(() => {
+			if (context.$vuetify.breakpoint.xsOnly) return calendarViewMode.value === 'week' ? 2 : 1;
+			return calendarViewMode.value === 'week' ? 8 : 3;
+		});
 
-		const monthLabel = computed(() => currentMonth.value.format('MMMM YYYY'));
+		const periodLabel = computed(() => {
+			if (calendarViewMode.value === 'week') {
+				const start = currentPeriod.value.clone().startOf('isoWeek');
+				const end = start.clone().add(6, 'days');
+				if (start.isSame(end, 'month')) return `${start.format('D')} - ${end.format('D MMMM YYYY')}`;
+				if (start.isSame(end, 'year')) return `${start.format('D MMM')} - ${end.format('D MMM YYYY')}`;
+				return `${start.format('D MMM YYYY')} - ${end.format('D MMM YYYY')}`;
+			}
+			return currentPeriod.value.format('MMMM YYYY');
+		});
+		const previousLabel = computed(() => calendarViewMode.value === 'week' ? 'Previous week' : 'Previous month');
+		const nextLabel = computed(() => calendarViewMode.value === 'week' ? 'Next week' : 'Next month');
 		const selectedDayKey = computed(() => selectedDay.value.format('YYYY-MM-DD'));
 		const selectedDayLabel = computed(() => selectedDay.value.format('dddd, D MMMM'));
 		const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-		const monthDays = computed(() => {
-			const start = currentMonth.value.clone().startOf('month').startOf('isoWeek');
+		const visibleDays = computed(() => {
+			const isWeek = calendarViewMode.value === 'week';
+			const start = isWeek
+				? currentPeriod.value.clone().startOf('isoWeek')
+				: currentPeriod.value.clone().startOf('month').startOf('isoWeek');
+			const count = isWeek ? 7 : 42;
 			const todayKey = moment().format('YYYY-MM-DD');
 			const days: Array<{
 				key: string;
 				label: string;
-				inMonth: boolean;
+				isOutside: boolean;
 				isToday: boolean;
 				items: CalendarTaskItem[];
 				visibleItems: CalendarTaskItem[];
 				hiddenCount: number;
 			}> = [];
-			for (let i = 0; i < 42; i++) {
+			for (let i = 0; i < count; i++) {
 				const date = start.clone().add(i, 'days');
 				const key = date.format('YYYY-MM-DD');
 				const dayItems = items.value.filter(item => item.start.isSame(date, 'day'));
 				days.push({
 					key,
 					label: date.format('D'),
-					inMonth: date.month() === currentMonth.value.month(),
+					isOutside: !isWeek && date.month() !== currentPeriod.value.month(),
 					isToday: key === todayKey,
 					items: dayItems,
 					visibleItems: dayItems.slice(0, visibleItemLimit.value),
@@ -221,27 +274,52 @@ export default defineComponent({
 			items.value.filter(item => item.start.isSame(selectedDay.value, 'day'))
 		);
 
-		watch(currentMonth, month => {
-			if (!selectedDay.value.isSame(month, 'month')) {
-				selectedDay.value = month.clone().startOf('month');
+		watch(currentPeriod, period => {
+			if (calendarViewMode.value === 'week') {
+				if (!selectedDay.value.isSame(period, 'isoWeek')) {
+					selectedDay.value = period.clone().startOf('isoWeek');
+				}
+				return;
+			}
+			if (!selectedDay.value.isSame(period, 'month')) {
+				selectedDay.value = period.clone().startOf('month');
 			}
 		});
 
-		const previousMonth = () => {
-			currentMonth.value = currentMonth.value.clone().subtract(1, 'month');
+		watch(calendarViewMode, mode => {
+			currentPeriod.value = selectedDay.value.clone().startOf(mode === 'week' ? 'isoWeek' : 'month');
+		});
+
+		const previousPeriod = () => {
+			const unit = calendarViewMode.value === 'week' ? 'week' : 'month';
+			currentPeriod.value = currentPeriod.value.clone().subtract(1, unit).startOf(unit === 'week' ? 'isoWeek' : 'month');
 		};
-		const nextMonth = () => {
-			currentMonth.value = currentMonth.value.clone().add(1, 'month');
+		const nextPeriod = () => {
+			const unit = calendarViewMode.value === 'week' ? 'week' : 'month';
+			currentPeriod.value = currentPeriod.value.clone().add(1, unit).startOf(unit === 'week' ? 'isoWeek' : 'month');
 		};
 		const goToday = () => {
 			selectedDay.value = moment().startOf('day');
-			currentMonth.value = selectedDay.value.clone().startOf('month');
+			currentPeriod.value = selectedDay.value.clone().startOf(calendarViewMode.value === 'week' ? 'isoWeek' : 'month');
 		};
 		const selectDay = (key: string) => {
 			selectedDay.value = moment(key, 'YYYY-MM-DD');
-			if (!selectedDay.value.isSame(currentMonth.value, 'month')) {
-				currentMonth.value = selectedDay.value.clone().startOf('month');
+			if (calendarViewMode.value === 'week') {
+				if (!selectedDay.value.isSame(currentPeriod.value, 'isoWeek')) {
+					currentPeriod.value = selectedDay.value.clone().startOf('isoWeek');
+				}
+				return;
 			}
+			if (!selectedDay.value.isSame(currentPeriod.value, 'month')) {
+				currentPeriod.value = selectedDay.value.clone().startOf('month');
+			}
+		};
+		const setCalendarViewMode = (value: CalendarViewMode) => {
+			if (value === calendarViewMode.value) return;
+			store.dispatch('updateSettings', {
+				...store.state.settings,
+				calendarViewMode: value
+			});
 		};
 		const setCalendarScope = (value: CalendarScope) => {
 			if (value === calendarScope.value) return;
@@ -256,18 +334,23 @@ export default defineComponent({
 
 		return {
 			calendarScope,
+			calendarViewMode,
 			hasMembers,
+			modeOptions,
 			scopeOptions,
-			monthLabel,
+			periodLabel,
+			previousLabel,
+			nextLabel,
 			selectedDayKey,
 			selectedDayLabel,
 			weekDays,
-			monthDays,
+			visibleDays,
 			selectedItems,
-			previousMonth,
-			nextMonth,
+			previousPeriod,
+			nextPeriod,
 			goToday,
 			selectDay,
+			setCalendarViewMode,
 			setCalendarScope,
 			refresh,
 			openTask,
@@ -301,7 +384,7 @@ export default defineComponent({
 	min-width: 0;
 }
 
-.tw-calendar__month {
+.tw-calendar__period {
 	font-size: 15px;
 	font-weight: 600;
 	color: var(--tw-text);
@@ -323,6 +406,10 @@ export default defineComponent({
 	border-radius: 8px;
 	overflow: hidden;
 	background: var(--tw-surface);
+}
+
+.tw-calendar__grid--week {
+	grid-auto-rows: minmax(0, auto);
 }
 
 .tw-calendar__weekday {
@@ -353,6 +440,10 @@ export default defineComponent({
 	color: var(--tw-text);
 	cursor: pointer;
 	overflow: hidden;
+}
+
+.tw-calendar__day--week {
+	min-height: clamp(260px, calc(100vh - 265px), 560px);
 }
 
 .tw-calendar__day:nth-child(7n) {
@@ -532,10 +623,11 @@ export default defineComponent({
 		width: 100%;
 	}
 
-	.tw-calendar__month {
+	.tw-calendar__period {
 		margin-left: auto;
 	}
 
+	.tw-calendar__mode,
 	.tw-calendar__scope {
 		width: 100%;
 	}
@@ -552,6 +644,10 @@ export default defineComponent({
 	.tw-calendar__day {
 		min-height: 92px;
 		padding: 6px;
+	}
+
+	.tw-calendar__day--week {
+		min-height: 150px;
 	}
 
 	.tw-calendar__pill {
@@ -572,6 +668,10 @@ export default defineComponent({
 
 	.tw-calendar__day {
 		min-height: 74px;
+	}
+
+	.tw-calendar__day--week {
+		min-height: 112px;
 	}
 
 	.tw-calendar__date {
