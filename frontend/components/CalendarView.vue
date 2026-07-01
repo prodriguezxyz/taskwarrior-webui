@@ -29,9 +29,6 @@
 					<v-icon size="18" aria-hidden="true">mdi-chevron-right</v-icon>
 				</button>
 				<div class="tw-calendar__period">{{ periodLabel }}</div>
-			</div>
-
-			<div class="tw-calendar__actions">
 				<nav
 					class="tw-tabs tw-calendar__mode"
 					role="tablist"
@@ -51,6 +48,9 @@
 						<span class="tw-tab__label">{{ opt.label }}</span>
 					</button>
 				</nav>
+			</div>
+
+			<div class="tw-calendar__actions">
 				<nav
 					v-if="hasMembers"
 					class="tw-tabs tw-calendar__scope"
@@ -384,12 +384,39 @@ export default defineComponent({
 	min-width: 0;
 }
 
+.tw-calendar__nav {
+	flex: 1 1 auto;
+}
+
+.tw-calendar__actions {
+	flex: 0 0 auto;
+}
+
 .tw-calendar__period {
 	font-size: 15px;
 	font-weight: 600;
 	color: var(--tw-text);
 	margin-left: 4px;
 	white-space: nowrap;
+}
+
+.tw-calendar__mode {
+	flex: 0 0 auto;
+	margin-left: 6px;
+}
+
+.tw-calendar__mode .tw-tab {
+	padding: 7px 10px;
+	border-radius: var(--tw-radius-sm);
+	margin-bottom: 0;
+}
+
+.tw-calendar__mode .tw-tab--active {
+	background: var(--tw-surface-hover);
+}
+
+.tw-calendar__mode .tw-tab--active::after {
+	display: none;
 }
 
 .tw-calendar__layout {
@@ -621,15 +648,19 @@ export default defineComponent({
 
 	.tw-calendar__nav {
 		width: 100%;
+		flex-wrap: wrap;
 	}
 
 	.tw-calendar__period {
-		margin-left: auto;
+		margin-left: 4px;
 	}
 
-	.tw-calendar__mode,
 	.tw-calendar__scope {
 		width: 100%;
+	}
+
+	.tw-calendar__mode {
+		margin-left: 0;
 	}
 
 	.tw-calendar__layout {
