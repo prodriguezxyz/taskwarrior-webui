@@ -116,7 +116,7 @@ function reminderDate(task: Task): ReminderDate | null {
 
 function parseTimedTaskDate(value: string | undefined, timeZone: string): Date | null {
 	if (!value) return null;
-	if (/^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d{8}$/.test(value)) return null;
+	if (hasNoTime(value)) return null;
 	const date = parseTaskDate(value);
 	if (!date) return null;
 	const localTime = new Intl.DateTimeFormat('en-GB', {
@@ -128,6 +128,12 @@ function parseTimedTaskDate(value: string | undefined, timeZone: string): Date |
 	}).format(date);
 	if (localTime === '00:00:00') return null;
 	return date;
+}
+
+function hasNoTime(value: string): boolean {
+	if (/^\d{4}-\d{2}-\d{2}$/.test(value) || /^\d{8}$/.test(value)) return true;
+	return /^\d{8}T000000Z$/.test(value)
+		|| /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.000)?Z$/.test(value);
 }
 
 function parseTaskDate(value: string): Date | null {
