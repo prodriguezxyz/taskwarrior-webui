@@ -95,6 +95,11 @@ export function parseDateToken(tok: string): string | undefined {
 		if (m.isValid()) return lower;
 	}
 
+	if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(lower)) {
+		const m = moment(lower, 'D/M/YYYY', true);
+		if (m.isValid()) return m.format('YYYY-MM-DD');
+	}
+
 	return undefined;
 }
 
@@ -215,13 +220,114 @@ const RELATIVE_UNIT_MAP: Record<string, string> = {
 	anos: 'y'
 };
 
-function relativeCountOf(tok: string | undefined): number | undefined {
+const RELATIVE_COUNT_WORDS: Record<string, number> = {
+	a: 1,
+	an: 1,
+	one: 1,
+	two: 2,
+	three: 3,
+	four: 4,
+	five: 5,
+	six: 6,
+	seven: 7,
+	eight: 8,
+	nine: 9,
+	ten: 10,
+	eleven: 11,
+	twelve: 12,
+	thirteen: 13,
+	fourteen: 14,
+	fifteen: 15,
+	sixteen: 16,
+	seventeen: 17,
+	eighteen: 18,
+	nineteen: 19,
+	twenty: 20,
+	twentyone: 21,
+	twentytwo: 22,
+	twentythree: 23,
+	twentyfour: 24,
+	twentyfive: 25,
+	twentysix: 26,
+	twentyseven: 27,
+	twentyeight: 28,
+	twentynine: 29,
+	thirty: 30,
+	thirtyone: 31,
+	un: 1,
+	una: 1,
+	uno: 1,
+	dos: 2,
+	tres: 3,
+	cuatro: 4,
+	cinco: 5,
+	seis: 6,
+	siete: 7,
+	ocho: 8,
+	nueve: 9,
+	diez: 10,
+	once: 11,
+	doce: 12,
+	trece: 13,
+	catorce: 14,
+	quince: 15,
+	dieciséis: 16,
+	dieciseis: 16,
+	diecisiete: 17,
+	dieciocho: 18,
+	diecinueve: 19,
+	veinte: 20,
+	veintiun: 21,
+	veintiuna: 21,
+	veintiuno: 21,
+	veintidos: 22,
+	veintitres: 23,
+	veinticuatro: 24,
+	veinticinco: 25,
+	veintiseis: 26,
+	veintisiete: 27,
+	veintiocho: 28,
+	veintinueve: 29,
+	treinta: 30
+};
+
+const EN_RELATIVE_ONES = new Set(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']);
+const ES_RELATIVE_ONES = new Set(['un', 'una', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve']);
+
+function normalizedCountWord(tok: string | undefined): string | undefined {
 	if (!tok) return undefined;
-	const plain = deaccent(tok.toLowerCase());
-	if (plain === 'a' || plain === 'an' || plain === 'one' || plain === 'un' || plain === 'una') return 1;
-	if (!/^\d+$/.test(plain)) return undefined;
-	const n = parseInt(plain, 10);
+	return deaccent(tok.toLowerCase()).replace(/-/g, '');
+}
+
+function numericCountOf(tok: string | undefined): number | undefined {
+	if (!tok || !/^\d+$/.test(tok)) return undefined;
+	const n = parseInt(tok, 10);
 	return n > 0 ? n : undefined;
+}
+
+function relativeCountFrom(tokens: string[], index: number): { count: number; length: number } | undefined {
+	const first = normalizedCountWord(tokens[index]);
+	if (!first) return undefined;
+
+	const numeric = numericCountOf(first);
+	if (numeric) return { count: numeric, length: 1 };
+
+	const second = normalizedCountWord(tokens[index + 1]);
+	if (first === 'twenty' && second && EN_RELATIVE_ONES.has(second)) {
+		return { count: 20 + RELATIVE_COUNT_WORDS[second], length: 2 };
+	}
+	if (first === 'thirty' && second === 'one') {
+		return { count: 31, length: 2 };
+	}
+	if (first === 'treinta' && second === 'y') {
+		const third = normalizedCountWord(tokens[index + 2]);
+		if (third && ES_RELATIVE_ONES.has(third)) {
+			return { count: 30 + RELATIVE_COUNT_WORDS[third], length: 3 };
+		}
+	}
+
+	const count = RELATIVE_COUNT_WORDS[first];
+	return count ? { count, length: 1 } : undefined;
 }
 
 function relativeUnitOf(tok: string | undefined): string | undefined {
@@ -229,11 +335,15 @@ function relativeUnitOf(tok: string | undefined): string | undefined {
 	return RELATIVE_UNIT_MAP[deaccent(tok.toLowerCase())];
 }
 
-function relativeToken(countTok: string | undefined, unitTok: string | undefined): string | undefined {
-	const count = relativeCountOf(countTok);
-	const unit = relativeUnitOf(unitTok);
-	if (!count || !unit) return undefined;
-	return `+${count}${unit}`;
+function relativeTokenFrom(tokens: string[], countIndex: number): { token: string; consumed: number } | undefined {
+	const parsedCount = relativeCountFrom(tokens, countIndex);
+	if (!parsedCount) return undefined;
+	const unit = relativeUnitOf(tokens[countIndex + parsedCount.length]);
+	if (!unit) return undefined;
+	return {
+		token: `+${parsedCount.count}${unit}`,
+		consumed: parsedCount.length + 1
+	};
 }
 
 // Collapses multi-word date phrases into the single tokens parseDateToken understands,
@@ -272,19 +382,19 @@ export function mergeDatePhrases(raw: string[]): string[] {
 		}
 
 		if (RELATIVE_PREFIX_WORDS.has(plain)) {
-			const rel = relativeToken(raw[i + 1], raw[i + 2]);
+			const rel = relativeTokenFrom(raw, i + 1);
 			if (rel) {
-				tokens.push(rel);
-				i += 2;
+				tokens.push(rel.token);
+				i += rel.consumed;
 				continue;
 			}
 		}
 
 		if (plain === 'dentro' && peekPlain === 'de') {
-			const rel = relativeToken(raw[i + 2], raw[i + 3]);
+			const rel = relativeTokenFrom(raw, i + 2);
 			if (rel) {
-				tokens.push(rel);
-				i += 3;
+				tokens.push(rel.token);
+				i += rel.consumed + 1;
 				continue;
 			}
 		}

@@ -270,6 +270,7 @@ export default defineComponent({
 			const seen = new Set<string>();
 			const byProfile = new Map<string, Set<string>>();
 			for (const t of store.state.tasks as TaskWithProfile[]) {
+				if (t.status === 'deleted') continue;
 				if (!t.project) continue;
 				const profile = t._profile || activeProfile.value;
 				if (!byProfile.has(profile)) byProfile.set(profile, new Set());

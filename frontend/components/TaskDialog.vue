@@ -229,6 +229,7 @@ export default defineComponent({
 			const set = new Set<string>();
 			for (const t of store.state.tasks) {
 				if (!inContext(t)) continue;
+				if (t.status === 'deleted') continue;
 				if (t.project) set.add(t.project);
 			}
 			return Array.from(set).sort();
@@ -242,6 +243,7 @@ export default defineComponent({
 			if (!multiProfile.value) return projects.value;
 			const byProfile = new Map<string, Set<string>>();
 			for (const t of store.state.tasks) {
+				if (t.status === 'deleted') continue;
 				if (!t.project) continue;
 				const prof = (t as TaskWithProfile)._profile || contextProfile.value;
 				if (!byProfile.has(prof)) byProfile.set(prof, new Set());
