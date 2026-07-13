@@ -110,7 +110,7 @@
 </template>
 
 <script lang="ts">
-import { watch, defineComponent, useStore, computed, ref, reactive } from '@nuxtjs/composition-api';
+import { defineComponent, useStore, computed, ref, reactive } from '@nuxtjs/composition-api';
 import { accessorType } from '../store';
 
 export default defineComponent({

@@ -1,4 +1,4 @@
-import { ActionTree, MutationTree, GetterTree } from 'vuex';
+import type { ActionTree, MutationTree, GetterTree } from 'vuex';
 import { Task } from 'taskwarrior-lib';
 import { getAccessorType } from 'typed-vuex';
 

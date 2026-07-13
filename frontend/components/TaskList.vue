@@ -1408,7 +1408,7 @@ export default defineComponent({
 	padding: 1px 6px;
 	border-radius: 4px;
 	border: 1px solid rgba(127, 127, 127, 0.35);
-	font-size: 11px;
+	font-size: 13px;
 	line-height: 1.4;
 	color: rgba(127, 127, 127, 0.95);
 	background: transparent;
@@ -1422,7 +1422,7 @@ export default defineComponent({
 	padding: 1px 6px;
 	border-radius: 4px;
 	border: 1px solid rgba(127, 127, 127, 0.35);
-	font-size: 11px;
+	font-size: 13px;
 	line-height: 1.4;
 	color: rgba(127, 127, 127, 0.95);
 	background: transparent;

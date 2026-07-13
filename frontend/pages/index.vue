@@ -38,7 +38,7 @@ export default defineComponent({
 		const context = useContext();
 		store.dispatch('fetchTasks');
 
-		let refreshInterval: NodeJS.Timeout | null = null;
+		let refreshInterval: ReturnType<typeof setInterval> | null = null;
 		const setAutoRefresh = () => {
 			if (refreshInterval)
 				clearInterval(refreshInterval);
@@ -56,7 +56,7 @@ export default defineComponent({
 		};
 		setAutoRefresh();
 
-		let syncInterval: NodeJS.Timeout | null = null;
+		let syncInterval: ReturnType<typeof setInterval> | null = null;
 		const setAutoSync = () => {
 			if (syncInterval)
 				clearInterval(syncInterval);
