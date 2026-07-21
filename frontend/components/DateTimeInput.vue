@@ -113,12 +113,16 @@ export default defineComponent({
 			const m = moment(str, [
 				moment.ISO_8601,
 				'YYYYMMDD[T]HHmmss',
+				'YYYYMMDD',
 				'YYYY-MM-DD HH:mm:ss',
 				'YYYY-MM-DD HH:mm',
 				'YYYY-MM-DD',
 				'YYYY/MM/DD',
 				'DD/MM/YYYY HH:mm',
 				'DD/MM/YYYY',
+				'D/M/YYYY',
+				'DD-MM-YYYY',
+				'D-M-YYYY',
 				'MM/DD/YYYY'
 			], true);
 			return m.isValid() ? m : null;
