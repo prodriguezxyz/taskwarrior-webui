@@ -3,7 +3,7 @@
 		v-model="showDialog"
 		max-width="600px"
 		persistent
-		@keydown.esc="closeDialog"
+		@keydown.esc="onEscape"
 	>
 		<v-card>
 			<v-card-title>
@@ -155,16 +155,23 @@
 					color="success"
 					class="text-none tw-complete-task"
 					title="Mark as done"
+					:disabled="submitting"
 					@click="completeTask"
 				>
 					<v-icon left small>mdi-check</v-icon>
 					Complete
 				</v-btn>
 				<v-spacer />
-				<v-btn text @click="closeDialog" width="80px">
+				<v-btn text :disabled="submitting" @click="closeDialog" width="80px">
 					Cancel
 				</v-btn>
-				<v-btn color="primary" @click="submit" :width="willMove ? undefined : '80px'">
+				<v-btn
+					color="primary"
+					:loading="submitting"
+					:disabled="submitting"
+					:width="willMove ? undefined : '80px'"
+					@click="submit"
+				>
 					{{ submitLabel }}
 				</v-btn>
 			</v-card-actions>
@@ -455,6 +462,7 @@ export default defineComponent({
 		});
 
 		const formRef = ref(null);
+		const submitting = ref(false);
 
 		const addAnnotation = () => {
 			formData.value.annotations.push({
@@ -468,6 +476,9 @@ export default defineComponent({
 		const closeDialog = () => {
 			showDialog.value = false;
 			reset();
+		};
+		const onEscape = () => {
+			if (!submitting.value) closeDialog();
 		};
 
 		const undoTask = async (original: Task) => {
@@ -505,8 +516,10 @@ export default defineComponent({
 		};
 
 		const submit = async () => {
+			if (submitting.value) return;
 			const valid = (formRef.value as any).validate();
 			if (!valid) return;
+			submitting.value = true;
 			// Editing a task whose chosen destination profile differs from where
 			// it currently lives → a cross-profile move (create in dest + delete
 			// from source) rather than a plain update.
@@ -543,6 +556,7 @@ export default defineComponent({
 				}
 			}
 			catch (err) {
+				submitting.value = false;
 				const leftover = (err as any)?.moveLeftover;
 				if (leftover) {
 					// The move created the task in the destination but couldn't
@@ -562,6 +576,7 @@ export default defineComponent({
 				});
 				return;
 			}
+			submitting.value = false;
 			store.commit('setNotification', {
 				color: 'success',
 				text: `Successfully ${crossProfile ? 'moved' : (props.task ? 'updated' : 'created')} the task`
@@ -595,8 +610,10 @@ export default defineComponent({
 			addAnnotationDescription,
 			addAnnotation,
 			closeDialog,
+			onEscape,
 			completeTask,
 			submit,
+			submitting,
 			showDialog,
 			projectSearch,
 			projectComboRef,
