@@ -1,3 +1,5 @@
+import webpack from 'webpack';
+
 export default {
 	server: {
 		port: 8080
@@ -40,8 +42,8 @@ export default {
   ** Global CSS
   */
 	css: [
-		// mdi font
-		'@mdi/font/css/materialdesignicons.css',
+		// MDI glyphs with a modern WOFF2-only font face.
+		'@/assets/mdi.scss',
 		// App css (design system)
 		'@/assets/app.css'
 	],
@@ -150,5 +152,20 @@ export default {
   ** See https://nuxtjs.org/api/configuration-build/
   */
 	build: {
+		plugins: [
+			// The app uses Moment's default English labels only. Bundling every locale
+			// adds hundreds of kilobytes to the initial vendor chunk.
+			new webpack.IgnorePlugin(/^\.\/locale$/, /moment$/)
+		],
+		extend(config, { isClient }) {
+			if (!isClient) return;
+			// Webpack's defaults target very small framework-free pages and measure
+			// uncompressed assets. Keep explicit budgets for this Nuxt 2/Vuetify SPA;
+			// the optimized initial JavaScript is about 300 KiB with gzip.
+			config.performance = {
+				maxAssetSize: 850 * 1024,
+				maxEntrypointSize: 1.5 * 1024 * 1024
+			};
+		}
 	}
 };

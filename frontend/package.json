@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "test": "TZ=Europe/Madrid ts-node-transpile-only --project tsconfig.json --compiler-options '{\"module\":\"commonjs\"}' test/run.ts",
+    "build:icons": "node scripts/build-mdi-subset.js",
     "dev": "NODE_OPTIONS=--openssl-legacy-provider nuxt",
-    "build": "NODE_OPTIONS=--openssl-legacy-provider nuxt-ts build",
-    "start": "NODE_OPTIONS=--openssl-legacy-provider nuxt-ts start",
-    "export": "NODE_OPTIONS=--openssl-legacy-provider nuxt-ts export",
-    "serve": "NODE_OPTIONS=--openssl-legacy-provider nuxt-ts serve",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider nuxt build",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider nuxt start",
+    "export": "NODE_OPTIONS=--openssl-legacy-provider nuxt export",
+    "serve": "NODE_OPTIONS=--openssl-legacy-provider nuxt serve",
     "lint": "eslint --fix --ext .ts,.js,.vue ."
   },
   "dependencies": {
     "@mdi/font": "^5.8.55",
-    "@nuxt/typescript-runtime": "^2.0.0",
     "@nuxtjs/axios": "^5.12.2",
     "@nuxtjs/composition-api": "^0.33.1",
     "@nuxtjs/proxy": "^2.0.1",

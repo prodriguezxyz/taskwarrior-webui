@@ -72,6 +72,7 @@
 <script lang="ts">
 import { defineComponent, ref, watch, computed, nextTick } from '@nuxtjs/composition-api';
 import moment from 'moment';
+import { combineDateTime } from '../utils/dateParse';
 
 export default defineComponent({
 	props: {
@@ -173,7 +174,8 @@ export default defineComponent({
 			}
 			let out = draftDate.value;
 			if (props.showTime && draftTime.value) {
-				out = `${draftDate.value}T${draftTime.value}:00`;
+				const [hours, minutes] = draftTime.value.split(':').map(Number);
+				out = combineDateTime(draftDate.value, { hours, minutes });
 			}
 			ctx.emit('input', out);
 			menu.value = false;

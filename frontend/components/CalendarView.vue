@@ -208,7 +208,7 @@ export default defineComponent({
 		];
 		const modeOptions: Array<CalendarOption<CalendarViewMode>> = [
 			{ value: 'month', label: 'Month', icon: 'mdi-calendar-month-outline' },
-			{ value: 'week', label: 'Week', icon: 'mdi-calendar-week-outline' }
+			{ value: 'week', label: 'Week', icon: 'mdi-calendar-week' }
 		];
 
 		const scopedTasks = computed(() => {

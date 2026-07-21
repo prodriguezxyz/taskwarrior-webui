@@ -16,6 +16,7 @@ export interface ParsedDateTimeInput {
 	date?: string;
 	time?: TimeOfDay;
 	due?: string;
+	error?: 'ambiguous-date';
 }
 
 // Strip diacritics so Spanish tokens compare the same with or without accents
@@ -24,8 +25,16 @@ export function deaccent(s: string): string {
 	return s.normalize('NFD').replace(/[\u0300-\u036F]/g, '');
 }
 
+// Ignore sentence punctuation only while recognizing date/time tokens. Callers
+// keep the original token so unrecognized prose is never rewritten.
+export function trimTokenPunctuation(tok: string): string {
+	return tok
+		.replace(/^[\(\[\{"'«¿¡“‘]+/u, '')
+		.replace(/[\)\]\}"'».,;:!?…“”’]+$/u, '');
+}
+
 export function dayIndexOf(tok: string): number {
-	const plain = deaccent(tok.toLowerCase());
+	const plain = deaccent(trimTokenPunctuation(tok).toLowerCase());
 	for (const list of [DAY_NAMES_FULL, DAY_NAMES_SHORT, DAY_ES_FULL]) {
 		const i = list.indexOf(plain);
 		if (i !== -1) return i;
@@ -46,7 +55,7 @@ export function dayOfWeekFrom(targetDow: number, weeksAhead = 0): string {
 }
 
 export function parseDateToken(tok: string): string | undefined {
-	const lower = tok.toLowerCase();
+	const lower = trimTokenPunctuation(tok).toLowerCase();
 	const plain = deaccent(lower);
 
 	if (lower === 'today' || plain === 'hoy') return moment().format('YYYY-MM-DD');
@@ -76,11 +85,14 @@ export function parseDateToken(tok: string): string | undefined {
 	if (weekOffset === 1 && dayTok === 'month') return moment().add(1, 'month').format('YYYY-MM-DD');
 
 	const dayIdx = dayIndexOf(dayTok);
-	if (dayIdx !== -1) return dayOfWeekFrom(dayIdx, weekOffset);
+	// dayOfWeekFrom already returns the next occurrence. Adding weekOffset here
+	// made advertised inputs such as "next monday" jump an extra week.
+	if (dayIdx !== -1) return dayOfWeekFrom(dayIdx);
 
 	const relMatch = /^\+(\d+)([dwmy])$/.exec(lower);
 	if (relMatch) {
 		const n = parseInt(relMatch[1], 10);
+		if (!Number.isSafeInteger(n) || n <= 0) return undefined;
 		const unitMap: Record<string, moment.unitOfTime.DurationConstructor> = {
 			d: 'days',
 			w: 'weeks',
@@ -95,8 +107,14 @@ export function parseDateToken(tok: string): string | undefined {
 		if (m.isValid()) return lower;
 	}
 
-	if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(lower)) {
-		const m = moment(lower, 'D/M/YYYY', true);
+	// Numeric user input is always day-first. Normalize before strict parsing so
+	// padded and unpadded forms behave identically (1/2/2027 === 01/02/2027).
+	const numericDate = /^(\d{1,2})([\/-])(\d{1,2})\2(\d{4})$/.exec(lower);
+	if (numericDate) {
+		const day = numericDate[1].padStart(2, '0');
+		const month = numericDate[3].padStart(2, '0');
+		const normalized = `${numericDate[4]}-${month}-${day}`;
+		const m = moment(normalized, 'YYYY-MM-DD', true);
 		if (m.isValid()) return m.format('YYYY-MM-DD');
 	}
 
@@ -108,7 +126,7 @@ export function parseDateToken(tok: string): string | undefined {
 // A time must carry a marker (colon, am/pm, an "h", or the word "noon"); bare
 // numbers like "3" are rejected on purpose so they stay part of the description.
 export function parseTimeToken(tok: string): TimeOfDay | undefined {
-	const lower = tok.toLowerCase();
+	const lower = trimTokenPunctuation(tok).toLowerCase();
 	const plain = deaccent(lower);
 
 	if (lower === 'noon' || plain === 'mediodia') return { hours: 12, minutes: 0 };
@@ -151,7 +169,7 @@ export function parseTimeToken(tok: string): TimeOfDay | undefined {
 // shift it. Only meaningful right after a time preposition ("a las", "at"); used as
 // the lookahead test there, never on its own, so stray numbers stay in the text.
 export function parseBareHour(tok: string): TimeOfDay | undefined {
-	const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(tok);
+	const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(trimTokenPunctuation(tok));
 	if (!m) return undefined;
 	const h = parseInt(m[1], 10);
 	const min = m[2] ? parseInt(m[2], 10) : 0;
@@ -170,7 +188,7 @@ export function isTimeLike(tok: string | undefined): boolean {
 // "a las 5 de la tarde" can shift 05:00 → 17:00. Returns undefined for anything else.
 export function dayPartOf(word: string | undefined): 'am' | 'pm' | undefined {
 	if (!word) return undefined;
-	const w = deaccent(word.toLowerCase());
+	const w = deaccent(trimTokenPunctuation(word).toLowerCase());
 	if (w === 'manana' || w === 'madrugada') return 'am';
 	if (w === 'tarde' || w === 'noche') return 'pm';
 	return undefined;
@@ -186,13 +204,14 @@ export function applyDayPart(
 	return { hours: h, minutes: time.minutes };
 }
 
-// Combines a date-only string (YYYY-MM-DD) and a parsed time into the local
-// datetime string the rest of the app uses for timed due dates
-// (YYYY-MM-DDTHH:mm:00) — the same shape DateTimeInput emits.
+// Combines a date and wall-clock time with the browser's UTC offset. Sending a
+// timezone-less value makes Taskwarrior interpret it in the server/container
+// timezone, which can shift 09:15 to 11:15 when displayed in Europe/Madrid.
 export function combineDateTime(date: string, time: TimeOfDay): string {
 	const hh = String(time.hours).padStart(2, '0');
 	const mm = String(time.minutes).padStart(2, '0');
-	return `${date}T${hh}:${mm}:00`;
+	return moment(`${date}T${hh}:${mm}:00`, 'YYYY-MM-DDTHH:mm:ss', true)
+		.format('YYYY-MM-DDTHH:mm:ssZ');
 }
 
 // English + Spanish "next"/"this" qualifiers. Merged with the following day/period
@@ -296,13 +315,19 @@ const ES_RELATIVE_ONES = new Set(['un', 'una', 'uno', 'dos', 'tres', 'cuatro', '
 
 function normalizedCountWord(tok: string | undefined): string | undefined {
 	if (!tok) return undefined;
-	return deaccent(tok.toLowerCase()).replace(/-/g, '');
+	const plain = deaccent(trimTokenPunctuation(tok).toLowerCase());
+	if (/^\d+$/.test(plain)) return plain;
+	// Internal hyphens are valid in written compounds such as "twenty-two".
+	// Signs, dangling hyphens and mixed digit/word tokens must not be erased,
+	// otherwise a negative count such as "-2" silently becomes positive.
+	if (!/^[a-z]+(?:-[a-z]+)*$/.test(plain)) return undefined;
+	return plain.replace(/-/g, '');
 }
 
 function numericCountOf(tok: string | undefined): number | undefined {
 	if (!tok || !/^\d+$/.test(tok)) return undefined;
 	const n = parseInt(tok, 10);
-	return n > 0 ? n : undefined;
+	return Number.isSafeInteger(n) && n > 0 ? n : undefined;
 }
 
 function relativeCountFrom(tokens: string[], index: number): { count: number; length: number } | undefined {
@@ -332,7 +357,7 @@ function relativeCountFrom(tokens: string[], index: number): { count: number; le
 
 function relativeUnitOf(tok: string | undefined): string | undefined {
 	if (!tok) return undefined;
-	return RELATIVE_UNIT_MAP[deaccent(tok.toLowerCase())];
+	return RELATIVE_UNIT_MAP[deaccent(trimTokenPunctuation(tok).toLowerCase())];
 }
 
 function relativeTokenFrom(tokens: string[], countIndex: number): { token: string; consumed: number } | undefined {
@@ -357,9 +382,9 @@ export function mergeDatePhrases(raw: string[]): string[] {
 	const tokens: string[] = [];
 	for (let i = 0; i < raw.length; i++) {
 		const cur = raw[i];
-		const lower = cur.toLowerCase();
+		const lower = trimTokenPunctuation(cur).toLowerCase();
 		const plain = deaccent(lower);
-		const peek = raw[i + 1]?.toLowerCase();
+		const peek = raw[i + 1] ? trimTokenPunctuation(raw[i + 1]).toLowerCase() : undefined;
 		const peekPlain = peek ? deaccent(peek) : undefined;
 
 		if ((NEXT_WORDS.has(plain) || THIS_WORDS.has(plain)) && peek) {
@@ -405,7 +430,7 @@ export function mergeDatePhrases(raw: string[]): string[] {
 			continue;
 		}
 
-		if (plain === 'fin' && peekPlain === 'de' && deaccent(raw[i + 2]?.toLowerCase() ?? '') === 'semana') {
+		if (plain === 'fin' && peekPlain === 'de' && deaccent(trimTokenPunctuation(raw[i + 2] ?? '').toLowerCase()) === 'semana') {
 			tokens.push('weekend');
 			i += 2;
 			continue;
@@ -424,8 +449,8 @@ export function mergeDateTimePhrases(raw: string[]): string[] {
 	const tokens: string[] = [];
 	for (let i = 0; i < dated.length; i++) {
 		const cur = dated[i];
-		const lower = cur.toLowerCase();
-		const peek = dated[i + 1]?.toLowerCase();
+		const lower = trimTokenPunctuation(cur).toLowerCase();
+		const peek = dated[i + 1] ? trimTokenPunctuation(dated[i + 1]).toLowerCase() : undefined;
 		if (/^\d{1,2}(:\d{2})?$/.test(lower) && (peek === 'am' || peek === 'pm')) {
 			tokens.push(`${lower}${peek}`);
 			i++;
@@ -462,12 +487,13 @@ export function parseDateTimeInput(
 	let date: string | undefined;
 	let time: TimeOfDay | undefined;
 	let matched = false;
+	const matchedDates = new Set<string>();
 
 	for (let i = 0; i < tokens.length; i++) {
 		const tok = tokens[i];
-		const lower = tok.toLowerCase();
+		const lower = trimTokenPunctuation(tok).toLowerCase();
 		const plain = deaccent(lower);
-		const next = tokens[i + 1]?.toLowerCase();
+		const next = tokens[i + 1] ? trimTokenPunctuation(tokens[i + 1]).toLowerCase() : undefined;
 
 		if (lower === 'at' && isTimeLike(tokens[i + 1])) {
 			time = parseTimeToken(tokens[i + 1]) ?? parseBareHour(tokens[i + 1]);
@@ -493,6 +519,7 @@ export function parseDateTimeInput(
 		const parsedDate = parseDateToken(lower);
 		if (parsedDate) {
 			date = parsedDate;
+			matchedDates.add(parsedDate);
 			matched = true;
 			continue;
 		}
@@ -504,6 +531,7 @@ export function parseDateTimeInput(
 	}
 
 	if (!matched) return undefined;
+	if (matchedDates.size > 1) return { error: 'ambiguous-date' };
 
 	const out: ParsedDateTimeInput = { date, time };
 	const dueDate = date ?? (time ? fallbackDate ?? moment().format('YYYY-MM-DD') : undefined);
@@ -513,16 +541,18 @@ export function parseDateTimeInput(
 	return out;
 }
 
-// Parses free-text date input (e.g. the reschedule popover) into a YYYY-MM-DD string,
-// or undefined if nothing in it reads as a date. Phrases are merged first, then the
-// first token that resolves wins — so "próximo lunes", "el viernes", "next mon",
-// "en 15 días" and "in 2 months" all work, English or Spanish.
+// Parses free-text date input into a YYYY-MM-DD string, or undefined if nothing
+// resolves or distinct date tokens conflict. Equivalent tokens for the same day
+// are allowed, so "tomorrow mañana" remains unambiguous.
 export function parseDateInput(input: string): string | undefined {
 	const trimmed = input.trim();
 	if (!trimmed) return undefined;
+	let matchedDate: string | undefined;
 	for (const tok of mergeDatePhrases(trimmed.split(/\s+/))) {
 		const date = parseDateToken(tok);
-		if (date) return date;
+		if (!date) continue;
+		if (matchedDate && matchedDate !== date) return undefined;
+		matchedDate = date;
 	}
-	return undefined;
+	return matchedDate;
 }

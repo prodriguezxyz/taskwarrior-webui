@@ -25,7 +25,7 @@
 					v-model="text"
 					type="text"
 					class="tw-reschedule__input"
-					placeholder="mañana 15:00, en 15 días a las 5…"
+					placeholder="mañana, en 2 semanas, 21/07/2026…"
 					autocomplete="off"
 					spellcheck="false"
 					aria-label="Reschedule date"
@@ -41,6 +41,7 @@
 				aria-atomic="true"
 			>
 				<template v-if="parsed">→ {{ parsedLabel }}</template>
+				<template v-else-if="dateError">Conflicting dates</template>
 				<template v-else-if="text">Unrecognized date</template>
 				<template v-else>&nbsp;</template>
 			</div>
@@ -125,7 +126,9 @@ export default defineComponent({
 			{ label: 'No date', hint: '—', value: undefined }
 		]);
 
-		const parsed = computed(() => parseDateTimeInput(text.value, existingDate.value, existingTime.value)?.due);
+		const parsedInput = computed(() => parseDateTimeInput(text.value, existingDate.value, existingTime.value));
+		const parsed = computed(() => parsedInput.value?.due);
+		const dateError = computed(() => parsedInput.value?.error);
 		const parsedLabel = computed(() => {
 			if (!parsed.value) return '';
 			const m = moment(parsed.value);
@@ -227,6 +230,7 @@ export default defineComponent({
 			presets,
 			parsed,
 			parsedLabel,
+			dateError,
 			apply,
 			close,
 			onInputEnter,

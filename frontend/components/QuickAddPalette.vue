@@ -77,6 +77,10 @@
 					<v-icon size="12" aria-hidden="true">mdi-calendar</v-icon>
 					{{ displayDate(parsed.due) }}
 				</span>
+				<span v-if="parsed.dateError" class="tw-quickadd__chip tw-quickadd__chip--error">
+					<v-icon size="12" aria-hidden="true">mdi-alert-circle-outline</v-icon>
+					Conflicting dates
+				</span>
 			</div>
 
 			<div class="tw-palette__hint">
@@ -90,6 +94,8 @@
 					<kbd>next mon</kbd>
 					<kbd>in 15 days</kbd>
 					<kbd>en 2 meses</kbd>
+					<kbd>dd/mm/yyyy</kbd>
+					<kbd>dd-mm-yyyy</kbd>
 					<kbd>+3d</kbd>
 					<kbd>eow</kbd>
 					<kbd>a las 5</kbd>
@@ -112,126 +118,11 @@ import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxt
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
-import {
-	deaccent,
-	mergeDateTimePhrases,
-	parseDateToken,
-	parseTimeToken,
-	parseBareHour,
-	isTimeLike,
-	dayPartOf,
-	applyDayPart,
-	combineDateTime
-} from '../utils/dateParse';
-
-const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
-	'1': 'H',
-	'2': 'M',
-	'3': 'L',
-	'4': undefined
-};
-
-interface Parsed {
-	description: string;
-	project?: string;
-	tags: string[];
-	priority?: 'H' | 'M' | 'L';
-	due?: string;
-}
+import { parseQuickAdd } from '../utils/quickAddParse';
 
 interface Suggestion {
 	text: string;
 	profile?: string;
-}
-
-// Merges date phrases and clock times split across tokens ("3 pm" -> "3pm").
-// "a las"/"at" prepositions are handled in the main loop, not here.
-function mergePhrases(raw: string[]): string[] {
-	return mergeDateTimePhrases(raw);
-}
-
-function parseQuickAdd(input: string): Parsed {
-	const out: Parsed = { description: '', tags: [] };
-	const tokens = mergePhrases(input.split(/\s+/).filter(Boolean));
-
-	const remaining: string[] = [];
-	let dueDate: string | undefined;
-	let dueTime: { hours: number; minutes: number } | undefined;
-
-	let i = 0;
-	while (i < tokens.length) {
-		const tok = tokens[i];
-		const lower = tok.toLowerCase();
-		const plain = deaccent(lower);
-
-		const proj = /^#([\p{L}\p{N}_.-]+)$/u.exec(tok);
-		if (proj) {
-			out.project = proj[1];
-			i++;
-			continue;
-		}
-		const tag = /^@([\p{L}\p{N}_-]+)$/u.exec(tok);
-		if (tag) {
-			if (!out.tags.includes(tag[1])) out.tags.push(tag[1]);
-			i++;
-			continue;
-		}
-		const pri = /^p([1-4])$/i.exec(tok);
-		if (pri) {
-			out.priority = PRIORITY_MAP[pri[1]];
-			i++;
-			continue;
-		}
-
-		// Time preposition: "at <time>", "a las <time>", "a la <time>". Only consumed when
-		// a time actually follows, so plain prose ("voy a la tienda") keeps its words. This
-		// is what lets a bare hour like "a las 5" register — parseBareHour accepts the marker-
-		// less number once the preposition vouches for it.
-		const next = tokens[i + 1]?.toLowerCase();
-		if (lower === 'at' && isTimeLike(tokens[i + 1])) {
-			dueTime = parseTimeToken(tokens[i + 1]) ?? parseBareHour(tokens[i + 1]);
-			i += 2;
-			continue;
-		}
-		if (lower === 'a' && (next === 'las' || next === 'la') && isTimeLike(tokens[i + 2])) {
-			dueTime = parseTimeToken(tokens[i + 2]) ?? parseBareHour(tokens[i + 2]);
-			i += 3;
-			continue;
-		}
-
-		// Daypart phrase "de/por la <mañana|tarde|noche|madrugada>": shifts an already-parsed
-		// time (5 -> 17 for "de la tarde"). With no time yet it's just prose — keep the words
-		// verbatim so "mañana" inside it isn't mistaken for tomorrow.
-		if ((plain === 'de' || plain === 'por') && deaccent(next ?? '') === 'la' && dayPartOf(tokens[i + 2])) {
-			if (dueTime) dueTime = applyDayPart(dueTime, dayPartOf(tokens[i + 2])!);
-			else remaining.push(tok, tokens[i + 1], tokens[i + 2]);
-			i += 3;
-			continue;
-		}
-
-		const date = parseDateToken(lower);
-		if (date) {
-			dueDate = date;
-			i++;
-			continue;
-		}
-		const time = parseTimeToken(lower);
-		if (time) {
-			dueTime = time;
-			i++;
-			continue;
-		}
-
-		remaining.push(tok);
-		i++;
-	}
-
-	// A bare time ("3pm") with no day attaches to today; "tomorrow 3pm" combines both.
-	if (dueTime) out.due = combineDateTime(dueDate ?? moment().format('YYYY-MM-DD'), dueTime);
-	else if (dueDate) out.due = dueDate;
-
-	out.description = remaining.join(' ').trim();
-	return out;
 }
 
 function displayDate(str?: string) {
@@ -367,6 +258,7 @@ export default defineComponent({
 			|| parsed.value.tags.length > 0
 			|| Boolean(parsed.value.priority)
 			|| Boolean(parsed.value.due)
+			|| Boolean(parsed.value.dateError)
 		);
 
 		watch(suggestions, () => {
@@ -450,7 +342,7 @@ export default defineComponent({
 		const submit = async () => {
 			if (submitting.value) return;
 			const p = parsed.value;
-			if (!p.description) return;
+			if (!p.description || p.dateError) return;
 			submitting.value = true;
 			// Route the write explicitly; otherwise the backend falls back to the
 			// user's first allowed profile, which can differ from the intended one.

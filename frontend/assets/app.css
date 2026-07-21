@@ -1388,6 +1388,13 @@ button.tw-icon-btn:focus-visible {
 	color: var(--tw-text);
 }
 
+.tw-quickadd__chip--error {
+	color: var(--tw-danger);
+	border-color: var(--tw-danger);
+}
+
+.tw-quickadd__chip--error .v-icon { color: var(--tw-danger) !important; }
+
 /* ============================================================
    FILTER BAR (tags + priority chips)
    ============================================================ */
