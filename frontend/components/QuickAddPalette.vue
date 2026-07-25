@@ -4,6 +4,7 @@
 		max-width="640"
 		content-class="tw-palette__dialog"
 		transition="fade-transition"
+		:persistent="submitting"
 		@keydown.esc="close"
 	>
 		<div class="tw-palette tw-quickadd" role="dialog" aria-label="Add task">
@@ -19,6 +20,7 @@
 					autocomplete="off"
 					spellcheck="false"
 					enterkeyhint="done"
+					:disabled="submitting"
 					@keydown.down.prevent="onDown"
 					@keydown.up.prevent="onUp"
 					@keydown.tab.prevent="onTab"
@@ -27,6 +29,55 @@
 					@click="syncCursor"
 					@select="syncCursor"
 				/>
+				<v-menu offset-y left>
+					<template v-slot:activator="{ on, attrs }">
+						<v-btn
+							v-bind="attrs"
+							v-on="on"
+							icon
+							small
+							:disabled="submitting"
+							aria-label="More actions"
+							title="More actions"
+						>
+							<v-icon size="18">mdi-dots-horizontal</v-icon>
+						</v-btn>
+					</template>
+					<v-list dense>
+						<v-list-item @click="showDescription">
+							<v-list-item-icon>
+								<v-icon small>mdi-pencil-outline</v-icon>
+							</v-list-item-icon>
+							<v-list-item-content>
+								<v-list-item-title>Description</v-list-item-title>
+							</v-list-item-content>
+						</v-list-item>
+					</v-list>
+				</v-menu>
+			</div>
+
+			<div v-if="detailsOpen" class="tw-quickadd__details">
+				<textarea
+					ref="detailsRef"
+					v-model="details"
+					class="tw-quickadd__details-input"
+					rows="2"
+					aria-label="Task description"
+					placeholder="Add more context…"
+					:disabled="submitting"
+					@keydown.ctrl.enter.prevent="submit"
+					@keydown.meta.enter.prevent="submit"
+				/>
+				<button
+					type="button"
+					class="tw-quickadd__submit"
+					:disabled="!canSubmit"
+					aria-label="Add task"
+					title="Add task"
+					@click="submit"
+				>
+					<v-icon size="18" aria-hidden="true">mdi-arrow-up</v-icon>
+				</button>
 			</div>
 
 			<div v-if="suggestions.length" class="tw-palette__results" role="listbox">
@@ -36,16 +87,18 @@
 					type="button"
 					role="option"
 					:aria-selected="i === activeIdx"
+					:disabled="submitting"
 					class="tw-palette__item"
 					:class="{ 'tw-palette__item--active': i === activeIdx }"
 					@mouseenter="activeIdx = i"
 					@mousedown.prevent="applySuggestion(s)"
 				>
 					<v-icon size="14" class="tw-palette__item-icon" aria-hidden="true">
-						{{ suggestionType === 'project' ? 'mdi-folder-outline' : 'mdi-tag-outline' }}
+						{{ suggestionIcon }}
 					</v-icon>
 					<span class="tw-palette__item-desc">{{ s.text }}</span>
-					<span v-if="s.profile" class="tw-palette__item-profile">{{ s.profile }}</span>
+					<span v-if="s.email" class="tw-palette__item-profile">{{ s.email }}</span>
+					<span v-else-if="s.profile" class="tw-palette__item-profile">{{ s.profile }}</span>
 				</button>
 			</div>
 
@@ -57,6 +110,16 @@
 				<span v-if="projectTargetProfile && projectTargetProfile !== activeProfile" class="tw-quickadd__chip">
 					<v-icon size="12" aria-hidden="true">mdi-account-switch-outline</v-icon>
 					{{ projectTargetProfile }}
+				</span>
+				<span
+					v-if="parsed.assignee"
+					class="tw-quickadd__chip"
+					:class="{ 'tw-quickadd__chip--error': !resolvedAssignee }"
+				>
+					<v-icon size="12" aria-hidden="true">
+						{{ resolvedAssignee ? 'mdi-account-outline' : 'mdi-alert-circle-outline' }}
+					</v-icon>
+					{{ resolvedAssigneeLabel || parsed.assignee }}
 				</span>
 				<span
 					v-for="t in parsed.tags"
@@ -87,6 +150,7 @@
 				<span class="tw-palette__hint-keys">
 					<kbd>#</kbd>project
 					<kbd>@</kbd>tag
+					<kbd>+</kbd>person
 					<kbd>p1-p4</kbd>
 					<kbd>today</kbd>
 					<kbd>mañana</kbd>
@@ -119,10 +183,13 @@ import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
 import { parseQuickAdd } from '../utils/quickAddParse';
+import { memberLabel, ProfileMember, resolveAssignee } from '../utils/assignee';
+import { buildQuickAddAnnotations } from '../utils/quickAddAnnotations';
 
 interface Suggestion {
 	text: string;
 	profile?: string;
+	email?: string;
 }
 
 function displayDate(str?: string) {
@@ -143,18 +210,25 @@ function displayDate(str?: string) {
 export default defineComponent({
 	setup() {
 		const store = useStore<typeof accessorType>();
+		const submitting = ref(false);
 
 		const open = computed({
 			get: () => store.state.quickAddOpen,
-			set: val => store.commit('setQuickAddOpen', val)
+			set: val => {
+				if (!val && submitting.value) return;
+				store.commit('setQuickAddOpen', val);
+			}
 		});
 
 		const text = ref('');
+		const details = ref('');
+		const detailsOpen = ref(false);
 		const cursorPos = ref(0);
 		const activeIdx = ref(0);
-		const submitting = ref(false);
 		const inputRef = ref<HTMLInputElement | null>(null);
+		const detailsRef = ref<HTMLTextAreaElement | null>(null);
 		const selectedProject = ref<{ project: string, profile: string } | null>(null);
+		const memberCache = ref<Record<string, ProfileMember[]>>({});
 		const activeProfile = computed(() => store.state.settings.profile);
 
 		const projectSuggestions = computed((): Suggestion[] => {
@@ -201,10 +275,10 @@ export default defineComponent({
 		const currentToken = computed(() => {
 			const pos = cursorPos.value;
 			const before = text.value.slice(0, pos);
-			const m = /([#@])([\p{L}\p{N}_.-]*)$/u.exec(before);
+			const m = /([#@+])([\p{L}\p{N}_.@+-]*)$/u.exec(before);
 			if (!m) return null;
 			return {
-				sigil: m[1] as '#' | '@',
+				sigil: m[1] as '#' | '@' | '+',
 				prefix: m[2],
 				start: pos - m[0].length
 			};
@@ -213,15 +287,40 @@ export default defineComponent({
 		const suggestionType = computed(() => {
 			const t = currentToken.value;
 			if (!t) return null;
-			return t.sigil === '#' ? 'project' : 'tag';
+			if (t.sigil === '#') return 'project';
+			if (t.sigil === '+') return 'assignee';
+			return 'tag';
 		});
+
+		const suggestionIcon = computed(() => {
+			if (suggestionType.value === 'project') return 'mdi-folder-outline';
+			if (suggestionType.value === 'assignee') return 'mdi-account-outline';
+			return 'mdi-tag-outline';
+		});
+
+		const assigneeMembers = computed(() => {
+			const profile = projectTargetProfile.value || activeProfile.value;
+			if (!profile) return [];
+			if (profile === activeProfile.value) return store.state.members;
+			return memberCache.value[profile] || [];
+		});
+
+		const assigneeSuggestions = computed((): Suggestion[] =>
+			assigneeMembers.value.map(member => ({
+				text: memberLabel(member),
+				email: member.email
+			}))
+		);
 
 		const suggestions = computed((): Suggestion[] => {
 			const t = currentToken.value;
 			if (!t) return [];
-			const list = t.sigil === '#'
+			if (t.sigil === '+' && /^\d/.test(t.prefix)) return [];
+			const list: Suggestion[] = t.sigil === '#'
 				? projectSuggestions.value
-				: tags.value.map(text => ({ text }));
+				: t.sigil === '+'
+					? assigneeSuggestions.value
+					: tags.value.map(text => ({ text }));
 			const prefix = t.prefix.toLowerCase();
 			const parsed = parseQuickAdd(text.value);
 			const used = t.sigil === '@' ? new Set(parsed.tags) : new Set<string>();
@@ -229,7 +328,8 @@ export default defineComponent({
 				.filter(item => {
 					if (used.has(item.text)) return false;
 					if (!prefix) return true;
-					return item.text.toLowerCase().includes(prefix);
+					return item.text.toLowerCase().includes(prefix)
+						|| Boolean(item.email?.toLowerCase().includes(prefix));
 				})
 				.slice(0, 6);
 		});
@@ -255,11 +355,31 @@ export default defineComponent({
 
 		const hasParsedMeta = computed(() =>
 			Boolean(parsed.value.project)
+			|| Boolean(parsed.value.assignee)
 			|| parsed.value.tags.length > 0
 			|| Boolean(parsed.value.priority)
 			|| Boolean(parsed.value.due)
 			|| Boolean(parsed.value.dateError)
 		);
+
+		const resolvedAssignee = computed(() =>
+			resolveAssignee(parsed.value.assignee, assigneeMembers.value)
+		);
+
+		const resolvedAssigneeLabel = computed(() => {
+			const email = resolvedAssignee.value;
+			if (!email) return '';
+			const member = assigneeMembers.value.find(m => m.email === email);
+			return member ? memberLabel(member) : store.getters.assigneeLabel(email);
+		});
+
+		const canSubmit = computed(() => {
+			const p = parsed.value;
+			return !submitting.value
+				&& Boolean(p.description)
+				&& !p.dateError
+				&& (!p.assignee || Boolean(resolvedAssignee.value));
+		});
 
 		watch(suggestions, () => {
 			activeIdx.value = 0;
@@ -268,6 +388,8 @@ export default defineComponent({
 		watch(open, async val => {
 			if (val) {
 				text.value = '';
+				details.value = '';
+				detailsOpen.value = false;
 				cursorPos.value = 0;
 				activeIdx.value = 0;
 				submitting.value = false;
@@ -276,6 +398,17 @@ export default defineComponent({
 				inputRef.value?.focus();
 			}
 		});
+
+		watch([open, projectTargetProfile], async ([isOpen, profile]) => {
+			if (!isOpen || !profile || profile === activeProfile.value || memberCache.value[profile]) return;
+			try {
+				const members = await store.dispatch('fetchMembersFor', profile);
+				memberCache.value = { ...memberCache.value, [profile]: members };
+			}
+			catch (err) {
+				console.error('[QuickAddPalette] fetchMembersFor failed:', err);
+			}
+		}, { immediate: true });
 
 		watch(text, () => {
 			const project = parseQuickAdd(text.value).project;
@@ -291,7 +424,15 @@ export default defineComponent({
 		};
 
 		const close = () => {
+			if (submitting.value) return;
 			open.value = false;
+		};
+
+		const showDescription = async () => {
+			if (submitting.value) return;
+			detailsOpen.value = true;
+			await nextTick();
+			detailsRef.value?.focus();
 		};
 
 		const onDown = () => {
@@ -317,22 +458,26 @@ export default defineComponent({
 			submit();
 		};
 
-		const suggestionKey = (s: Suggestion) => `${s.profile || ''}::${s.text}`;
+		const suggestionKey = (s: Suggestion) => `${s.profile || ''}::${s.email || s.text}`;
 
 		const applySuggestion = (s: Suggestion) => {
+			if (submitting.value) return;
 			const t = currentToken.value;
 			if (!t) return;
 			const before = text.value.slice(0, t.start);
 			const after = text.value.slice(cursorPos.value);
 			const insert = `${t.sigil}${s.text} `;
+			const insertText = t.sigil === '+' && s.email
+				? `+${s.email} `
+				: insert;
 			if (t.sigil === '#' && s.profile) {
 				selectedProject.value = { project: s.text, profile: s.profile };
 			}
-			text.value = before + insert + after;
+			text.value = before + insertText + after;
 			nextTick(() => {
 				const el = inputRef.value;
 				if (!el) return;
-				const newPos = t.start + insert.length;
+				const newPos = t.start + insertText.length;
 				el.focus();
 				el.setSelectionRange(newPos, newPos);
 				cursorPos.value = newPos;
@@ -343,6 +488,13 @@ export default defineComponent({
 			if (submitting.value) return;
 			const p = parsed.value;
 			if (!p.description || p.dateError) return;
+			if (p.assignee && !resolvedAssignee.value) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Unknown assignee'
+				});
+				return;
+			}
 			submitting.value = true;
 			// Route the write explicitly; otherwise the backend falls back to the
 			// user's first allowed profile, which can differ from the intended one.
@@ -351,9 +503,10 @@ export default defineComponent({
 				description: p.description,
 				project: p.project,
 				tags: p.tags.length ? p.tags : undefined,
+				assignee: resolvedAssignee.value,
 				priority: p.priority,
 				due: p.due,
-				annotations: []
+				annotations: buildQuickAddAnnotations(details.value)
 			};
 			try {
 				await store.dispatch('updateTasks', [payload]);
@@ -379,23 +532,33 @@ export default defineComponent({
 		return {
 			open,
 			text,
+			details,
+			detailsOpen,
 			inputRef,
+			detailsRef,
 			suggestions,
 			suggestionType,
+			suggestionIcon,
 			suggestionKey,
 			activeIdx,
 			parsed,
 			activeProfile,
 			projectTargetProfile,
 			hasParsedMeta,
+			resolvedAssignee,
+			resolvedAssigneeLabel,
+			canSubmit,
 			displayDate,
 			close,
+			showDescription,
 			onDown,
 			onUp,
 			onTab,
 			onEnter,
 			applySuggestion,
-			syncCursor
+			syncCursor,
+			submit,
+			submitting
 		};
 	}
 });

@@ -2,7 +2,10 @@ import type { ActionTree, MutationTree, GetterTree } from 'vuex';
 import { Task } from 'taskwarrior-lib';
 import { getAccessorType } from 'typed-vuex';
 
-export type TaskWithProfile = Task & { _profile?: string };
+export type TaskWithProfile = Task & {
+	_profile?: string;
+	assignee?: string;
+};
 export type ViewName = 'all' | 'today' | 'calendar' | 'tags' | 'projects' | 'mine';
 export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'calendar', 'mine']);
 export function isCrossProfileView(view: ViewName): boolean {
@@ -258,13 +261,7 @@ export const actions: ActionTree<RootState, RootState> = {
 	// the UI) stays put while a dialog edits a cross-profile task.
 	async fetchMembersFor(_context, profile: string) {
 		if (!profile) return [];
-		try {
-			return await loadProfileMembers(this.$axios, profile);
-		}
-		catch (err) {
-			console.error('[store] fetchMembersFor failed:', err);
-			return [];
-		}
+		return await loadProfileMembers(this.$axios, profile);
 	},
 
 	async fetchTasks(context) {

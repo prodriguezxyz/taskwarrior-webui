@@ -100,6 +100,29 @@ assert.deepStrictEqual(parseQuickAdd('Comprar pan mañana, #casa @recado p2'), {
 	priority: 'M',
 	due: '2026-07-22'
 });
+assert.deepStrictEqual(parseQuickAdd('Preparar informe #trabajo +pedro mañana'), {
+	description: 'Preparar informe',
+	project: 'trabajo',
+	assignee: 'pedro',
+	tags: [],
+	due: '2026-07-22'
+});
+assert.deepStrictEqual(parseQuickAdd('Revisar contrato +pedro@example.com @legal p1'), {
+	description: 'Revisar contrato',
+	assignee: 'pedro@example.com',
+	tags: ['legal'],
+	priority: 'H'
+});
+assert.deepStrictEqual(parseQuickAdd('Revisar contrato +ana+tasks@example.com'), {
+	description: 'Revisar contrato',
+	assignee: 'ana+tasks@example.com',
+	tags: []
+});
+assert.deepStrictEqual(parseQuickAdd('Revisar estimación +3d'), {
+	description: 'Revisar estimación',
+	tags: [],
+	due: '2026-07-24'
+});
 assert.deepStrictEqual(parseQuickAdd('Llamar mañana a las 5 de la tarde.'), {
 	description: 'Llamar',
 	tags: [],

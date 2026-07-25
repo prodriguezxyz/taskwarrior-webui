@@ -1131,6 +1131,11 @@ button.tw-icon-btn:focus-visible {
 
 .tw-palette__input::placeholder { color: var(--tw-text-faint); }
 
+.tw-palette__input:disabled {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+
 /* type='search' brings WebKit's native cancel button — we render our own */
 .tw-palette__input::-webkit-search-cancel-button,
 .tw-palette__input::-webkit-search-decoration {
@@ -1220,6 +1225,11 @@ button.tw-icon-btn:focus-visible {
 .tw-palette__item--active,
 .tw-palette__item:hover {
 	background: var(--tw-surface);
+}
+
+.tw-palette__item:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
 }
 
 .tw-palette__item-icon { color: var(--tw-text-muted) !important; flex-shrink: 0; }
@@ -1356,6 +1366,77 @@ button.tw-icon-btn:focus-visible {
 	padding: 10px 16px;
 	border-top: 1px solid var(--tw-border);
 	background: var(--tw-bg);
+}
+
+.tw-quickadd__details {
+	display: flex;
+	align-items: flex-end;
+	gap: 10px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--tw-border);
+	background: var(--tw-bg);
+}
+
+.tw-quickadd__details-input {
+	flex: 1;
+	min-width: 0;
+	min-height: 58px;
+	max-height: 160px;
+	resize: vertical;
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius-sm);
+	outline: none;
+	background: var(--tw-surface);
+	color: var(--tw-text);
+	font-family: var(--tw-font);
+	font-size: 15px;
+	line-height: 1.45;
+	padding: 8px 10px;
+}
+
+.tw-quickadd__details-input::placeholder { color: var(--tw-text-faint); }
+
+.tw-quickadd__details-input:disabled {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+
+.tw-quickadd__details-input:focus {
+	border-color: var(--tw-accent);
+	box-shadow: 0 0 0 1px var(--tw-accent);
+}
+
+.tw-quickadd__submit {
+	appearance: none;
+	width: 34px;
+	height: 34px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	border: 1px solid var(--tw-accent);
+	border-radius: var(--tw-radius-sm);
+	background: var(--tw-accent);
+	color: var(--tw-accent-fg);
+	cursor: pointer;
+	transition: background 120ms ease, border-color 120ms ease;
+}
+
+.tw-quickadd__submit .v-icon { color: inherit !important; }
+
+.tw-quickadd__submit:hover:not(:disabled) {
+	border-color: var(--tw-accent-hover);
+	background: var(--tw-accent-hover);
+}
+
+.tw-quickadd__submit:focus-visible {
+	outline: 2px solid var(--tw-accent);
+	outline-offset: 2px;
+}
+
+.tw-quickadd__submit:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
 }
 
 .tw-quickadd__chip {

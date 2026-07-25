@@ -290,6 +290,9 @@ export default defineComponent({
 				store.dispatch('fetchMembersFor', contextProfile.value)
 					.then(m => {
 						fetchedMembers.value = m;
+					})
+					.catch(err => {
+						console.error('[TaskDialog] fetchMembersFor failed:', err);
 					});
 			}
 		}, { immediate: true });

@@ -22,6 +22,7 @@ const PRIORITY_MAP: Record<string, 'H' | 'M' | 'L' | undefined> = {
 export interface ParsedQuickAdd {
 	description: string;
 	project?: string;
+	assignee?: string;
 	tags: string[];
 	priority?: 'H' | 'M' | 'L';
 	due?: string;
@@ -92,6 +93,12 @@ export function parseQuickAdd(input: string): ParsedQuickAdd {
 		const time = parseTimeToken(lower);
 		if (time) {
 			dueTime = time;
+			i++;
+			continue;
+		}
+		const assignee = /^\+([\p{L}\p{N}_.@+-]+)$/u.exec(tok);
+		if (assignee) {
+			out.assignee = assignee[1];
 			i++;
 			continue;
 		}
