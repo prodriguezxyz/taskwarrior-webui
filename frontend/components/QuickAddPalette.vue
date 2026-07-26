@@ -216,6 +216,7 @@ export default defineComponent({
 		const activeIdx = ref(0);
 		const inputRef = ref<HTMLInputElement | null>(null);
 		const detailsRef = ref<HTMLTextAreaElement | null>(null);
+		let focusCycle = 0;
 		const selectedProject = ref<{ project: string, profile: string } | null>(null);
 		const memberCache = ref<Record<string, ProfileMember[]>>({});
 		const activeProfile = computed(() => store.state.settings.profile);
@@ -375,6 +376,7 @@ export default defineComponent({
 		});
 
 		watch(open, async val => {
+			const cycle = ++focusCycle;
 			if (val) {
 				text.value = '';
 				details.value = '';
@@ -384,9 +386,15 @@ export default defineComponent({
 				submitting.value = false;
 				selectedProject.value = null;
 				await nextTick();
-				inputRef.value?.focus();
+				if (cycle === focusCycle && open.value) inputRef.value?.focus();
 			}
-		});
+			else {
+				const active = document.activeElement;
+				if (active === inputRef.value || active === detailsRef.value) {
+					(active as HTMLElement).blur();
+				}
+			}
+		}, { flush: 'sync' });
 
 		watch([open, projectTargetProfile], async ([isOpen, profile]) => {
 			if (!isOpen || !profile || profile === activeProfile.value || memberCache.value[profile]) return;

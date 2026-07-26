@@ -479,8 +479,11 @@ export default defineComponent({
 		};
 
 		const onGlobalKeydown = (e: KeyboardEvent) => {
+			if (e.isComposing) return;
+			const key = e.key.toLowerCase();
+
 			// Ctrl+K works everywhere (Linear/Slack idiom), even inside inputs.
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+			if ((e.ctrlKey || e.metaKey) && key === 'k') {
 				e.preventDefault();
 				openSearch();
 				return;
@@ -492,7 +495,7 @@ export default defineComponent({
 
 			if (gPending) {
 				disarmG();
-				switch (e.key.toLowerCase()) {
+				switch (key) {
 					case 'i': e.preventDefault(); selectInbox(); return;
 					case 't': e.preventDefault(); selectToday(); return;
 					case 'c': e.preventDefault(); selectCalendar(); return;
@@ -502,7 +505,7 @@ export default defineComponent({
 				// Unknown continuation — fall through so the key still acts as a shortcut.
 			}
 
-			switch (e.key) {
+			switch (key) {
 				case '/':
 					e.preventDefault(); openSearch(); return;
 				case 'q':
