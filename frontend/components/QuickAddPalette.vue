@@ -148,29 +148,18 @@
 
 			<div class="tw-palette__hint">
 				<span class="tw-palette__hint-keys">
-					<kbd>#</kbd>project
-					<kbd>@</kbd>tag
-					<kbd>+</kbd>person
-					<kbd>p1-p4</kbd>
-					<kbd>today</kbd>
-					<kbd>mañana</kbd>
-					<kbd>lunes</kbd>
-					<kbd>next mon</kbd>
-					<kbd>in 15 days</kbd>
-					<kbd>en 2 meses</kbd>
-					<kbd>dd/mm/yyyy</kbd>
-					<kbd>dd-mm-yyyy</kbd>
-					<kbd>+3d</kbd>
-					<kbd>eow</kbd>
-					<kbd>a las 5</kbd>
-					<kbd>3pm</kbd>
-					<kbd>15:00</kbd>
+					<span class="tw-palette__hint-pair"><kbd>#</kbd>project</span>
+					<span class="tw-palette__hint-pair"><kbd>@</kbd>tag</span>
+					<span class="tw-palette__hint-pair"><kbd>+</kbd>person</span>
+					<span class="tw-palette__hint-pair"><kbd>p1-p4</kbd>priority</span>
+					<span class="tw-palette__hint-pair"><kbd>today</kbd>date</span>
+					<span class="tw-palette__hint-pair"><kbd>mañana</kbd>date</span>
+					<span class="tw-palette__hint-pair"><kbd>+3d</kbd>date</span>
+					<span class="tw-palette__hint-pair"><kbd>3pm</kbd>time</span>
 				</span>
 				<span class="tw-palette__hint-keys">
-					<kbd>↵</kbd>
-					add
-					<kbd>Esc</kbd>
-					close
+					<span class="tw-palette__hint-pair"><kbd>↵</kbd>add</span>
+					<span class="tw-palette__hint-pair"><kbd>Esc</kbd>close</span>
 				</span>
 			</div>
 		</div>
