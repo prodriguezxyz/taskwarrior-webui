@@ -511,6 +511,7 @@ export default defineComponent({
 					color: 'success',
 					text: 'Task added'
 				});
+				submitting.value = false;
 				close();
 			}
 			catch (err) {
