@@ -1,7 +1,10 @@
-FROM alpine:latest
+FROM alpine:3.24
 
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.20/main" > /etc/apk/repositories
-RUN echo "https://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+# task3 3.4.2 (the version currently deployed) is available in the 3.24
+# community repo, so no edge/community mixing is needed — main and
+# community both track the pinned base release.
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.24/main" > /etc/apk/repositories
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.24/community" >> /etc/apk/repositories
 RUN apk --no-cache add nodejs npm nginx task3 python3 build-base
 
 COPY ./frontend /src/frontend
