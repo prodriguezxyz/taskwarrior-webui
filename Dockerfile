@@ -39,7 +39,4 @@ RUN cd /src/backend && npm ci \
 
 EXPOSE 80
 
-# Taskwarrior data volume
-VOLUME [ "/.task", "/.taskrc" ]
-
 CMD ["/start.sh"]
