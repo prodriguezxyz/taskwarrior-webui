@@ -7,6 +7,7 @@ import {
 	isTimeLike,
 	mergeDateTimePhrases,
 	parseBareHour,
+	parseDateInput,
 	parseDateToken,
 	parseRecurrencePhrase,
 	parseTimeToken,
@@ -27,9 +28,16 @@ export interface ParsedQuickAdd {
 	tags: string[];
 	priority?: 'H' | 'M' | 'L';
 	due?: string;
+	scheduled?: string;
+	until?: string;
 	recur?: string;
+	reminder?: string;
+	_reminderBeforeMinutes?: number;
+	durationMinutes?: number;
 	dateError?: 'ambiguous';
 	recurrenceError?: 'ambiguous' | 'unsupported';
+	reminderError?: 'ambiguous' | 'unsupported';
+	durationError?: 'ambiguous';
 }
 
 export interface QuickAddParseOptions {
@@ -40,7 +48,8 @@ export interface QuickAddParseOptions {
 export interface QuickAddOverrides {
 	priority?: 'H' | 'M' | 'L' | null;
 	due?: string;
-	recurrence?: { recur: string, due: string };
+	scheduled?: string;
+	recurrence?: { recur: string, due: string, until?: string };
 }
 
 export function applyQuickAddOverrides(
@@ -55,12 +64,25 @@ export function applyQuickAddOverrides(
 	if (overrides.recurrence) {
 		result.recur = overrides.recurrence.recur;
 		result.due = overrides.recurrence.due;
+		if (overrides.recurrence.until) result.until = overrides.recurrence.until;
 		delete result.dateError;
 		delete result.recurrenceError;
 	}
 	if (overrides.due) {
 		result.due = overrides.due;
 		delete result.dateError;
+	}
+	if (overrides.scheduled) result.scheduled = overrides.scheduled;
+	if (result._reminderBeforeMinutes) {
+		const reminderBase = [result.scheduled, result.due]
+			.find(value => value && /T\d{2}:\d{2}/.test(value));
+		if (reminderBase) {
+			result.reminder = moment(reminderBase)
+				.subtract(result._reminderBeforeMinutes, 'minutes')
+				.format('YYYY-MM-DDTHH:mm:ssZ');
+			delete result.reminderError;
+			delete result._reminderBeforeMinutes;
+		}
 	}
 	return result;
 }
@@ -69,13 +91,6 @@ function unsupportedRecurrenceLength(tokens: string[], index: number): number {
 	const prefix = deaccent(trimTokenPunctuation(tokens[index] ?? '').toLowerCase());
 	if (prefix !== 'cada' && prefix !== 'every') return 0;
 	const first = deaccent(trimTokenPunctuation(tokens[index + 1] ?? '').toLowerCase());
-	if (first === 'weekend' || first === 'finde') return 2;
-	if (
-		first === 'fin'
-		&& deaccent(trimTokenPunctuation(tokens[index + 2] ?? '').toLowerCase()) === 'de'
-		&& deaccent(trimTokenPunctuation(tokens[index + 3] ?? '').toLowerCase()) === 'semana'
-	) return 4;
-
 	// Keep common Todoist-style recurrence variants intact when we cannot map
 	// them safely to Taskwarrior yet. Otherwise the weekday at the end would be
 	// consumed as a one-off date and the task title would be silently altered.
@@ -105,22 +120,120 @@ function shouldParsePartialNumericDate(tokens: string[], index: number, token: s
 	);
 }
 
+type ReminderSpec =
+	| { kind: 'absolute', value: string }
+	| { kind: 'relative', minutes: number }
+	| { kind: 'before', minutes: number };
+
+function parseReminderToken(token: string): ReminderSpec | undefined {
+	if (!token.startsWith('!') || token.length === 1) return undefined;
+	const value = deaccent(trimTokenPunctuation(token.slice(1)).toLowerCase());
+	if (value === 'later') return { kind: 'relative', minutes: 240 };
+	if (value === 'tomorrow' || value === 'manana') {
+		const date = parseDateToken(value);
+		return date
+			? { kind: 'absolute', value: combineDateTime(date, { hours: 9, minutes: 0 }) }
+			: undefined;
+	}
+	const before = /^(\d+)(m|min|h)b$/.exec(value);
+	if (before) {
+		return {
+			kind: 'before',
+			minutes: Number(before[1]) * (before[2] === 'h' ? 60 : 1)
+		};
+	}
+	const relative = /^(\d+)(m|min|h)$/.exec(value);
+	if (relative) {
+		return {
+			kind: 'relative',
+			minutes: Number(relative[1]) * (relative[2] === 'h' ? 60 : 1)
+		};
+	}
+	const time = parseTimeToken(value);
+	if (!time) return undefined;
+	let reminder = moment(combineDateTime(moment().format('YYYY-MM-DD'), time));
+	if (!reminder.isAfter(moment())) reminder = reminder.add(1, 'day');
+	return { kind: 'absolute', value: reminder.format('YYYY-MM-DDTHH:mm:ssZ') };
+}
+
+function parseDurationPhrase(tokens: string[], index: number): { minutes: number, consumed: number } | undefined {
+	const prefix = deaccent(trimTokenPunctuation(tokens[index] ?? '').toLowerCase());
+	if (prefix !== 'for' && prefix !== 'durante') return undefined;
+	const value = deaccent(trimTokenPunctuation(tokens[index + 1] ?? '').toLowerCase());
+	const compact = /^(?:(\d+)h)?(?:(\d+)m)?$/.exec(value);
+	if (compact && (compact[1] || compact[2])) {
+		const minutes = Number(compact[1] || 0) * 60 + Number(compact[2] || 0);
+		return minutes > 0 && minutes <= 1440 ? { minutes, consumed: 2 } : undefined;
+	}
+	if (!/^\d+$/.test(value)) return undefined;
+	const amount = Number(value);
+	const unit = deaccent(trimTokenPunctuation(tokens[index + 2] ?? '').toLowerCase());
+	const multiplier = ['h', 'hour', 'hours', 'hora', 'horas'].includes(unit) ? 60
+		: ['m', 'min', 'minute', 'minutes', 'minuto', 'minutos'].includes(unit) ? 1
+			: 0;
+	const minutes = amount * multiplier;
+	return minutes > 0 && minutes <= 1440 ? { minutes, consumed: 3 } : undefined;
+}
+
+export function durationMinutesToIso(minutes: number): string {
+	if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+		throw new RangeError('Duration must be a whole number between 1 and 1440 minutes');
+	}
+	const hours = Math.floor(minutes / 60);
+	const remainder = minutes % 60;
+	return `PT${hours ? `${hours}H` : ''}${remainder ? `${remainder}M` : ''}`;
+}
+
+export function durationIsoToMinutes(value: string | number | undefined): number | undefined {
+	if (typeof value === 'number') {
+		return Number.isFinite(value) && value > 0 ? Math.max(1, Math.round(value / 60)) : undefined;
+	}
+	if (!value) return undefined;
+	const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i.exec(value);
+	if (!match) return undefined;
+	const minutes = Number(match[1] || 0) * 1440
+		+ Number(match[2] || 0) * 60
+		+ Number(match[3] || 0)
+		+ Number(match[4] || 0) / 60;
+	return minutes > 0 ? Math.max(1, Math.round(minutes)) : undefined;
+}
+
 export function parseQuickAdd(input: string, options: QuickAddParseOptions = {}): ParsedQuickAdd {
 	const out: ParsedQuickAdd = { description: '', tags: [] };
 	const parseDates = options.parseDates !== false;
 	const parseRecurrences = options.parseRecurrences !== false;
-	const rawTokens = input.split(/\s+/).filter(Boolean);
+	const explicitDueDates: string[] = [];
+	const parseInput = parseDates
+		? input.replace(/\{([^{}]+)\}/g, (phrase, inner: string) => {
+			const date = parseDateInput(inner.trim());
+			if (!date) return phrase;
+			explicitDueDates.push(date);
+			return ' ';
+		})
+		: input;
+	const rawTokens = parseInput.split(/\s+/).filter(Boolean);
 	const hasUnsupportedRecurrence = rawTokens.some((_, index) =>
 		unsupportedRecurrenceLength(rawTokens, index) > 0
 	);
-	const tokens = parseDates && !hasUnsupportedRecurrence
+	const hasMultiwordWeekendRecurrence = rawTokens.some((token, index) => {
+		const prefix = deaccent(trimTokenPunctuation(token).toLowerCase());
+		return (prefix === 'cada' || prefix === 'every')
+			&& deaccent(trimTokenPunctuation(rawTokens[index + 1] ?? '').toLowerCase()) === 'fin'
+			&& deaccent(trimTokenPunctuation(rawTokens[index + 2] ?? '').toLowerCase()) === 'de'
+			&& deaccent(trimTokenPunctuation(rawTokens[index + 3] ?? '').toLowerCase()) === 'semana';
+	});
+	const tokens = parseDates && !hasUnsupportedRecurrence && !(hasMultiwordWeekendRecurrence && !parseRecurrences)
 		? mergeDateTimePhrases(rawTokens)
 		: rawTokens;
 	const remaining: string[] = [];
 	const matchedDates = new Set<string>();
-	let dueDate: string | undefined;
+	for (const date of explicitDueDates) matchedDates.add(date);
+	let dueDate: string | undefined = explicitDueDates[0];
 	let dueTime: { hours: number; minutes: number } | undefined;
 	let recurrenceCount = 0;
+	let reminderSpec: ReminderSpec | undefined;
+	let reminderCount = 0;
+	let durationCount = 0;
 
 	let i = 0;
 	while (i < tokens.length) {
@@ -146,6 +259,28 @@ export function parseQuickAdd(input: string, options: QuickAddParseOptions = {})
 			i++;
 			continue;
 		}
+		if (tok.startsWith('!')) {
+			const reminder = parseReminderToken(tok);
+			if (!reminder) {
+				remaining.push(tok);
+				out.reminderError = 'unsupported';
+			}
+			else {
+				reminderCount++;
+				if (reminderCount > 1) out.reminderError = 'ambiguous';
+				else reminderSpec = reminder;
+			}
+			i++;
+			continue;
+		}
+		const duration = parseDurationPhrase(tokens, i);
+		if (duration) {
+			durationCount++;
+			if (durationCount > 1) out.durationError = 'ambiguous';
+			else out.durationMinutes = duration.minutes;
+			i += duration.consumed;
+			continue;
+		}
 
 		const unsupportedLength = unsupportedRecurrenceLength(tokens, i);
 		if (unsupportedLength) {
@@ -162,11 +297,18 @@ export function parseQuickAdd(input: string, options: QuickAddParseOptions = {})
 				i += recurrence.consumed;
 				continue;
 			}
+			if (recurrence.error) {
+				remaining.push(...tokens.slice(i, i + recurrence.consumed));
+				out.recurrenceError = 'unsupported';
+				i += recurrence.consumed;
+				continue;
+			}
 			recurrenceCount++;
 			if (recurrenceCount > 1) out.recurrenceError = 'ambiguous';
 			else {
 				out.recur = recurrence.recur;
 				dueDate = recurrence.due;
+				if (recurrence.until) out.until = recurrence.until;
 			}
 			matchedDates.add(recurrence.due);
 			i += recurrence.consumed;
@@ -223,6 +365,17 @@ export function parseQuickAdd(input: string, options: QuickAddParseOptions = {})
 	if (matchedDates.size > 1) out.dateError = 'ambiguous';
 	else if (dueTime) out.due = combineDateTime(dueDate ?? moment().format('YYYY-MM-DD'), dueTime);
 	else if (dueDate) out.due = dueDate;
+	if (reminderSpec?.kind === 'absolute') out.reminder = reminderSpec.value;
+	else if (reminderSpec?.kind === 'relative') {
+		out.reminder = moment().add(reminderSpec.minutes, 'minutes').format('YYYY-MM-DDTHH:mm:ssZ');
+	}
+	else if (reminderSpec?.kind === 'before') {
+		if (!out.due || !/T\d{2}:\d{2}/.test(out.due)) {
+			out._reminderBeforeMinutes = reminderSpec.minutes;
+			out.reminderError = 'unsupported';
+		}
+		else out.reminder = moment(out.due).subtract(reminderSpec.minutes, 'minutes').format('YYYY-MM-DDTHH:mm:ssZ');
+	}
 
 	out.description = remaining.join(' ').trim();
 	return out;

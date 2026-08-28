@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test": "ts-node test/profileUdas.test.ts",
     "dev": "AUTH_MODE=dev PROFILES_CONFIG=./test/profiles.json USERS_CONFIG=./test/users.json ts-node src/app.ts",
     "build": "rm -rf dist && tsc",
     "start": "node ./dist/app.js"

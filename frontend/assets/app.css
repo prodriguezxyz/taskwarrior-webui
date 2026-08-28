@@ -1439,6 +1439,106 @@ button.tw-icon-btn:focus-visible {
 	background: var(--tw-bg);
 }
 
+.tw-quickadd__batch {
+	padding: 10px 12px 12px;
+	border-bottom: 1px solid var(--tw-border);
+	background: var(--tw-bg);
+}
+
+.tw-quickadd__batch-head,
+.tw-quickadd__batch-actions,
+.tw-quickadd__batch-item {
+	display: flex;
+	align-items: center;
+}
+
+.tw-quickadd__batch-head {
+	justify-content: space-between;
+	padding: 0 4px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--tw-text-muted);
+}
+
+.tw-quickadd__batch-error { color: var(--tw-danger); }
+
+.tw-quickadd__batch-list {
+	max-height: 260px;
+	overflow-y: auto;
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius-sm);
+}
+
+.tw-quickadd__batch-item {
+	gap: 8px;
+	min-height: 36px;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--tw-border);
+}
+
+.tw-quickadd__batch-item:last-child { border-bottom: 0; }
+
+.tw-quickadd__batch-item--error { background: var(--tw-danger-soft); }
+
+.tw-quickadd__batch-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 14px;
+	color: var(--tw-text);
+}
+
+.tw-quickadd__batch-meta {
+	max-width: 45%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 11px;
+	color: var(--tw-text-faint);
+}
+
+.tw-quickadd__batch-item > button,
+.tw-quickadd__batch-actions > button {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--tw-text-muted);
+	cursor: pointer;
+}
+
+.tw-quickadd__batch-item > button:disabled,
+.tw-quickadd__batch-actions > button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.tw-quickadd__batch-actions {
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 10px;
+}
+
+.tw-quickadd__batch-actions > button {
+	padding: 5px 8px;
+	border-radius: var(--tw-radius-sm);
+	font-family: var(--tw-font);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.tw-quickadd__batch-actions > button:hover:not(:disabled) { background: var(--tw-surface-hover); }
+
+.tw-quickadd__batch-actions > .tw-quickadd__batch-submit {
+	background: var(--tw-accent);
+	color: var(--tw-accent-fg);
+}
+
+.tw-quickadd__batch-actions > .tw-quickadd__batch-submit:hover:not(:disabled) {
+	background: var(--tw-accent-hover);
+}
+
 .tw-quickadd__details {
 	display: flex;
 	align-items: flex-end;

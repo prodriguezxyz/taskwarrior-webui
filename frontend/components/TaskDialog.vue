@@ -83,6 +83,22 @@
 					<v-row class="px-3">
 						<DateTimeInput
 							class="mr-3"
+							v-model="formData.reminder"
+							label="Reminder"
+							show-time
+						/>
+						<v-text-field
+							v-model.number="formData.estimateMinutes"
+							type="number"
+							min="1"
+							max="1440"
+							label="Estimate (minutes)"
+							:rules="durationRules"
+						/>
+					</v-row>
+					<v-row class="px-3">
+						<DateTimeInput
+							class="mr-3"
 							v-model="formData.scheduled"
 							label="Scheduled"
 							show-time
@@ -183,6 +199,7 @@
 import { defineComponent, useStore, watch, computed, ref, nextTick } from '@nuxtjs/composition-api';
 import { Task } from 'taskwarrior-lib';
 import { accessorType, TaskWithProfile } from '../store';
+import { durationIsoToMinutes, durationMinutesToIso } from '../utils/quickAddParse';
 
 export default defineComponent({
 	props: {
@@ -336,6 +353,12 @@ export default defineComponent({
 		const requiredRules = [
 			(str: string) => Boolean(str) || 'Required'
 		];
+		const durationRules = [
+			(value: string | number) => value === ''
+				|| value === null
+				|| (Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 1440)
+				|| 'Use a whole number from 1 to 1440'
+		];
 
 		const addAnnotationDescription = ref('');
 		const projectSearch = ref<string | null>('');
@@ -427,6 +450,8 @@ export default defineComponent({
 			due: '',
 			until: '',
 			wait: '',
+			reminder: (props.task as TaskWithProfile | undefined)?.twui_reminder || '',
+			estimateMinutes: durationIsoToMinutes((props.task as TaskWithProfile | undefined)?.twui_duration) || '',
 			tags: [] as string[],
 			annotations: [] as {entry: string; description: string}[],
 			priority: 'N',
@@ -443,6 +468,8 @@ export default defineComponent({
 				due: '',
 				until: '',
 				wait: '',
+				reminder: (props.task as TaskWithProfile | undefined)?.twui_reminder || '',
+				estimateMinutes: durationIsoToMinutes((props.task as TaskWithProfile | undefined)?.twui_duration) || '',
 				tags: [] as string[],
 				annotations: [] as {entry: string; description: string}[],
 				priority: 'N',
@@ -527,8 +554,9 @@ export default defineComponent({
 			// it currently lives → a cross-profile move (create in dest + delete
 			// from source) rather than a plain update.
 			const crossProfile = Boolean(props.task) && willMove.value;
+			const { estimateMinutes, reminder, ...formValues } = formData.value;
 			const payload: any = {
-				...formData.value,
+				...formValues,
 				annotations: formData.value.annotations || [],
 				project: formData.value.project || undefined,
 				// Member lists are per-profile, so a source-profile assignee is
@@ -538,6 +566,8 @@ export default defineComponent({
 				due: formData.value.due || undefined,
 				until: formData.value.until || undefined,
 				wait: formData.value.wait || undefined,
+				twui_reminder: reminder || undefined,
+				twui_duration: estimateMinutes ? durationMinutesToIso(Number(estimateMinutes)) : undefined,
 				priority: formData.value.priority === 'N' ? undefined : formData.value.priority,
 				recur: recur.value ? formData.value.recur : undefined,
 				// Destination profile applied LAST so the props.task spread above
@@ -596,6 +626,7 @@ export default defineComponent({
 
 		return {
 			requiredRules,
+			durationRules,
 			formRef,
 			tags,
 			projects,

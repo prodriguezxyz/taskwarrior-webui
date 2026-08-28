@@ -13,6 +13,7 @@ This fork is maintained primarily for personal use. Compared to upstream it adds
 - Per-user authentication via Cloudflare Access, with per-profile authorization.
 - Client-side text search with `/` and `Ctrl+K` shortcuts.
 - Mobile-friendly tweaks: denser rows and a quick-add FAB.
+- Todoist-style Quick Add with natural dates, recurrence, reminders, duration, and multi-line paste.
 - Reusable date/time picker for `Due` / `Until` / `Scheduled` / `Wait` fields.
 - Backend write serialization per profile to prevent data corruption under concurrent edits.
 
@@ -111,11 +112,21 @@ docker run -d -p 8080:80 --name taskwarrior-webui \
 
 A profile selector appears in the top bar whenever two or more profiles are defined. If `PROFILES_CONFIG` points to a missing file, the UI falls back to a single default profile using `TASKRC` and `TASKDATA`.
 
+### Quick Add
+
+Press `q` to open Quick Add with the input focused. It understands projects (`#project`), tags (`+tag`), assignees (`@name`), priorities (`p1` to `p3`), natural dates such as `29/8` or `tomorrow 10:00`, recurrence (`every week`, `cada trimestre desde 1/9 hasta 31/12`), reminders (`!3pm`, `!30mb`) and durations (`durante 45m`). Dates in braces, for example `{29/8}`, are always treated as deadlines; the Schedule and Deadline controls can also be used explicitly.
+
+Use `Shift+Enter` to save a task and keep Quick Add open. Pasting multiple non-empty lines opens a preview and creates one task per line; bullet and numbered-list prefixes are removed automatically. The preview is capped at 100 tasks per paste.
+
+Reminder and duration values are stored in the application-owned Taskwarrior UDAs `twui_reminder` and `twui_duration`. On startup, the backend ensures that those UDA definitions (and `assignee`) exist in every configured profile's `.taskrc`, while leaving unrelated settings untouched. If definitions are missing, `.taskrc` must be writable; the backend fails at startup with a profile-specific error instead of accepting tasks it cannot persist correctly.
+
 ### CalDAV task alerts
 
 The backend can mirror timed Taskwarrior tasks into a CalDAV calendar, such as Radicale, as `VEVENT` entries with a `VALARM`. Taskwarrior remains the source of truth; calendar entries are only a projection for calendar views and client-side reminders.
 
-Mirroring is enabled only when `CALDAV_ENABLED` is truthy and `CALDAV_BASE_URL` points at a calendar collection. A pending task is mirrored when it has `scheduled` with a non-midnight time; if not, `due` with a non-midnight time is used. Date-only values are ignored so ordinary deadlines do not become noisy reminders. Completed, deleted, waiting without a timed reminder, or untimed tasks remove their generated event.
+Mirroring is enabled only when `CALDAV_ENABLED` is truthy and `CALDAV_BASE_URL` points at a calendar collection. A pending task is mirrored when it has `scheduled` with a non-midnight time; if not, `due` with a non-midnight time is used. A task with only a timed `twui_reminder` uses that time for its event. Date-only values are ignored so ordinary deadlines do not become noisy reminders. Completed, deleted, waiting without a timed reminder, or untimed tasks remove their generated event.
+
+When present, `twui_reminder` becomes an absolute `VALARM` trigger and `twui_duration` controls the event length. Otherwise, the event uses `CALDAV_ALARM_TRIGGER` and `CALDAV_EVENT_DURATION_MINUTES` as fallbacks.
 
 Generated event UIDs are stable: `taskwarrior-{profile}-{uuid}`. The same UID is also used as the `.ics` resource filename under `CALDAV_BASE_URL`, so updates are idempotent across repeated writes and task syncs.
 

@@ -5,6 +5,8 @@ import { getAccessorType } from 'typed-vuex';
 export type TaskWithProfile = Task & {
 	_profile?: string;
 	assignee?: string;
+	twui_reminder?: string;
+	twui_duration?: string | number;
 };
 export type ViewName = 'all' | 'today' | 'calendar' | 'tags' | 'projects' | 'mine';
 export const CROSS_PROFILE_VIEWS: ReadonlySet<ViewName> = new Set(['today', 'calendar', 'mine']);

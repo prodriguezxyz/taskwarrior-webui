@@ -1,7 +1,9 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as Router from '@koa/router';
 import { TaskwarriorLib } from 'taskwarrior-lib';
+import { renderProfileUdas, writeProfileUdas } from './profileUdas';
 
 interface ProfileConfig {
 	name: string;
@@ -43,28 +45,23 @@ function loadProfileConfigs(): ProfileConfig[] {
 	return parsed.profiles;
 }
 
-function ensureAssigneeUda(lib: TaskwarriorLib, profile: ProfileConfig): void {
+function ensureProfileUdas(profile: ProfileConfig): void {
 	try {
-		// `task config` won't create the .taskrc on its own (Taskwarrior 3 errors with
-		// "Cannot proceed without rc file"). Touch it first so the first-boot case works
-		// against an empty profile directory; existing files are preserved.
-		if (profile.taskrc && !fs.existsSync(profile.taskrc)) {
-			fs.mkdirSync(path.dirname(profile.taskrc), { recursive: true });
-			fs.writeFileSync(profile.taskrc, '');
-		}
-		lib.executeCommand('config uda.assignee.type string');
-		lib.executeCommand('config uda.assignee.label "Assigned to"');
+		const taskrc = profile.taskrc || process.env.TASKRC || path.join(os.homedir(), '.taskrc');
+		const current = fs.existsSync(taskrc) ? fs.readFileSync(taskrc, 'utf8') : '';
+		const next = renderProfileUdas(current);
+		if (current !== next) writeProfileUdas(taskrc, next);
 	}
 	catch (err) {
-		console.error(`[profiles] failed to ensure assignee UDA on "${profile.name}": ${(err as Error).message}`);
+		throw new Error(`[profiles] failed to ensure profile UDAs on "${profile.name}": ${(err as Error).message}`);
 	}
 }
 
 const configs = loadProfileConfigs();
 const instances: Map<string, TaskwarriorLib> = new Map();
 for (const p of configs) {
+	ensureProfileUdas(p);
 	const lib = new TaskwarriorLib(p.taskrc, p.taskdata);
-	ensureAssigneeUda(lib, p);
 	instances.set(p.name, lib);
 }
 const defaultName = configs[0].name;

@@ -6,7 +6,12 @@ import {
 	parseDateTimeInput,
 	parseDateToken
 } from '../utils/dateParse';
-import { applyQuickAddOverrides, parseQuickAdd } from '../utils/quickAddParse';
+import {
+	applyQuickAddOverrides,
+	durationIsoToMinutes,
+	durationMinutesToIso,
+	parseQuickAdd
+} from '../utils/quickAddParse';
 
 moment.now = () => Date.UTC(2026, 6, 21, 12, 0, 0);
 
@@ -201,14 +206,56 @@ assert.deepStrictEqual(parseQuickAdd('Preparar informe mensual', {
 	tags: []
 });
 assert.deepStrictEqual(parseQuickAdd('Tarea cada fin de semana'), {
-	description: 'Tarea cada fin de semana',
+	description: 'Tarea',
 	tags: [],
-	recurrenceError: 'unsupported'
+	due: '2026-07-25',
+	recur: 'weekly'
 });
 assert.deepStrictEqual(parseQuickAdd('Tarea cada fin de semana', { parseRecurrences: false }), {
 	description: 'Tarea cada fin de semana',
 	tags: []
 });
+assert.deepStrictEqual(parseQuickAdd('Tarea cada trimestre'), {
+	description: 'Tarea',
+	tags: [],
+	due: '2026-07-21',
+	recur: 'quarterly'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea quincenal'), {
+	description: 'Tarea',
+	tags: [],
+	due: '2026-07-21',
+	recur: 'biweekly'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea cada semana empezando 29/8 hasta 31/12'), {
+	description: 'Tarea',
+	tags: [],
+	due: '2026-08-29',
+	until: '2026-12-31',
+	recur: 'weekly'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea mensual hasta 31/12'), {
+	description: 'Tarea',
+	tags: [],
+	due: '2026-07-21',
+	until: '2026-12-31',
+	recur: 'monthly'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea cada semana empezando 31/12 hasta 29/8'), {
+	description: 'Tarea cada semana empezando 31/12 hasta 29/8',
+	tags: [],
+	recurrenceError: 'unsupported'
+});
+for (const ambiguous of [
+	'cada semana empezando 29/8 empezando 30/8',
+	'mensual hasta 31/12 hasta 30/11'
+]) {
+	assert.deepStrictEqual(parseQuickAdd(`Tarea ${ambiguous}`), {
+		description: `Tarea ${ambiguous}`,
+		tags: [],
+		recurrenceError: 'unsupported'
+	}, ambiguous);
+}
 for (const unsupported of [
 	'every other Tuesday',
 	'every last Friday',
@@ -260,6 +307,80 @@ assert.deepStrictEqual(parseQuickAdd('Preparar reunión 1/2 #trabajo %agenda p2'
 	priority: 'M',
 	due: '2027-02-01'
 });
+assert.deepStrictEqual(parseQuickAdd('Presentar informe {29/8}'), {
+	description: 'Presentar informe',
+	tags: [],
+	due: '2026-08-29'
+});
+assert.deepStrictEqual(parseQuickAdd('Presentar informe mañana {29/8}'), {
+	description: 'Presentar informe',
+	tags: [],
+	dateError: 'ambiguous'
+});
+assert.deepStrictEqual(parseQuickAdd('Reunión mañana 10:00 !30mb durante 1h15m'), {
+	description: 'Reunión',
+	tags: [],
+	due: '2026-07-22T10:00:00+02:00',
+	reminder: '2026-07-22T09:30:00+02:00',
+	durationMinutes: 75
+});
+assert.deepStrictEqual(parseQuickAdd('Llamar !3pm'), {
+	description: 'Llamar',
+	tags: [],
+	reminder: '2026-07-21T15:00:00+02:00'
+});
+assert.deepStrictEqual(parseQuickAdd('Descansar !2h'), {
+	description: 'Descansar',
+	tags: [],
+	reminder: '2026-07-21T16:00:00+02:00'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea !30mb'), {
+	description: 'Tarea',
+	tags: [],
+	_reminderBeforeMinutes: 30,
+	reminderError: 'unsupported'
+});
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea !30mb'), {
+		scheduled: '2026-07-22T10:00:00+02:00'
+	}),
+	{
+		description: 'Tarea',
+		tags: [],
+		scheduled: '2026-07-22T10:00:00+02:00',
+		reminder: '2026-07-22T09:30:00+02:00'
+	}
+);
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea mañana 10:00 !30mb'), {
+		scheduled: '2026-07-22'
+	}),
+	{
+		description: 'Tarea',
+		tags: [],
+		due: '2026-07-22T10:00:00+02:00',
+		scheduled: '2026-07-22',
+		reminder: '2026-07-22T09:30:00+02:00'
+	}
+);
+assert.deepStrictEqual(parseQuickAdd('Tarea !algo'), {
+	description: 'Tarea !algo',
+	tags: [],
+	reminderError: 'unsupported'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea durante 20 minutos for 1h'), {
+	description: 'Tarea',
+	tags: [],
+	durationMinutes: 20,
+	durationError: 'ambiguous'
+});
+assert.strictEqual(durationMinutesToIso(75), 'PT1H15M');
+assert.strictEqual(durationMinutesToIso(120), 'PT2H');
+assert.throws(() => durationMinutesToIso(-1), /between 1 and 1440/);
+assert.throws(() => durationMinutesToIso(1441), /between 1 and 1440/);
+assert.throws(() => durationMinutesToIso(1.5), /whole number/);
+assert.strictEqual(durationIsoToMinutes('PT1H15M'), 75);
+assert.strictEqual(durationIsoToMinutes(4500), 75);
 assert.deepStrictEqual(
 	applyQuickAddOverrides(parseQuickAdd('Tarea today tomorrow p1'), {
 		due: '2026-07-24',
@@ -284,12 +405,14 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
 	applyQuickAddOverrides(parseQuickAdd('Tarea mañana', { parseDates: false }), {
-		due: '2026-07-24'
+		due: '2026-07-24',
+		scheduled: '2026-07-23'
 	}),
 	{
 		description: 'Tarea mañana',
 		tags: [],
-		due: '2026-07-24'
+		due: '2026-07-24',
+		scheduled: '2026-07-23'
 	}
 );
 assert.deepStrictEqual(

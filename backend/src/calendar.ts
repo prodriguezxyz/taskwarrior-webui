@@ -18,9 +18,12 @@ interface CalendarConfig {
 }
 
 interface ReminderDate {
-	source: 'scheduled' | 'due';
+	source: 'scheduled' | 'due' | 'reminder';
 	date: Date;
+	alarmDate?: Date;
 }
+
+type CalendarTask = Task & { twui_reminder?: string; twui_duration?: string | number };
 
 const router = new Router();
 
@@ -107,10 +110,12 @@ export async function runCalendarSync(label: string, work: () => Promise<void>):
 function reminderDate(task: Task): ReminderDate | null {
 	if (task.status !== 'pending') return null;
 	const config = calendarConfig();
+	const reminder = parseTimedTaskDate((task as CalendarTask).twui_reminder, config.timeZone);
 	const scheduled = parseTimedTaskDate(task.scheduled, config.timeZone);
-	if (scheduled) return { source: 'scheduled', date: scheduled };
+	if (scheduled) return { source: 'scheduled', date: scheduled, alarmDate: reminder || undefined };
 	const due = parseTimedTaskDate(task.due, config.timeZone);
-	if (due) return { source: 'due', date: due };
+	if (due) return { source: 'due', date: due, alarmDate: reminder || undefined };
+	if (reminder) return { source: 'reminder', date: reminder, alarmDate: reminder };
 	return null;
 }
 
@@ -170,7 +175,11 @@ async function putCalendarEvent(
 	reminder: ReminderDate
 ): Promise<void> {
 	const start = reminder.date;
-	const end = new Date(start.getTime() + config.durationMinutes * 60000);
+	const durationMinutes = taskDurationMinutes(task as CalendarTask) || config.durationMinutes;
+	const end = new Date(start.getTime() + durationMinutes * 60000);
+	const alarmTrigger = reminder.alarmDate
+		? `TRIGGER;VALUE=DATE-TIME:${formatIcalDate(reminder.alarmDate)}`
+		: `TRIGGER:${config.alarmTrigger}`;
 	const body = serializeIcal([
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
@@ -185,7 +194,7 @@ async function putCalendarEvent(
 		`SUMMARY:${escapeIcalText(task.description || 'Taskwarrior task')}`,
 		`DESCRIPTION:${escapeIcalText(eventDescription(profile, task, reminder.source))}`,
 		'BEGIN:VALARM',
-		`TRIGGER:${config.alarmTrigger}`,
+		alarmTrigger,
 		'ACTION:DISPLAY',
 		`DESCRIPTION:${escapeIcalText(task.description || 'Taskwarrior task')}`,
 		'END:VALARM',
@@ -193,6 +202,22 @@ async function putCalendarEvent(
 		'END:VCALENDAR'
 	]);
 	await caldavRequest(config, 'PUT', eventUrl(config, profile, task.uuid!), body);
+}
+
+function taskDurationMinutes(task: CalendarTask): number | null {
+	if (typeof task.twui_duration === 'number') {
+		return Number.isFinite(task.twui_duration) && task.twui_duration > 0
+			? Math.max(1, Math.round(task.twui_duration / 60))
+			: null;
+	}
+	if (!task.twui_duration) return null;
+	const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i.exec(task.twui_duration);
+	if (!match) return null;
+	const minutes = Number(match[1] || 0) * 1440
+		+ Number(match[2] || 0) * 60
+		+ Number(match[3] || 0)
+		+ Number(match[4] || 0) / 60;
+	return minutes > 0 ? Math.max(1, Math.round(minutes)) : null;
 }
 
 function eventDescription(profile: string, task: Task, source: string): string {

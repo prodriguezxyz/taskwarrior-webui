@@ -21,10 +21,12 @@
 					spellcheck="false"
 					enterkeyhint="done"
 					:disabled="submitting"
+					:readonly="batchMode"
 					@keydown.down.prevent="onDown"
 					@keydown.up.prevent="onUp"
 					@keydown.tab="onTab"
 					@keydown.enter.prevent="onEnter"
+					@paste="onPaste"
 					@keyup="syncCursor"
 					@click="syncCursor"
 					@select="syncCursor"
@@ -32,7 +34,7 @@
 			</div>
 
 			<div class="tw-quickadd__actions" role="group" aria-label="Task actions">
-				<button type="button" class="tw-quickadd__action" :disabled="submitting" @click="insertSyntax('#')">
+				<button type="button" class="tw-quickadd__action" :disabled="submitting || batchMode" @click="insertSyntax('#')">
 					<v-icon size="14" aria-hidden="true">mdi-folder-outline</v-icon>
 					{{ parsed.project || 'Project' }}
 				</button>
@@ -40,11 +42,24 @@
 					<template v-slot:activator="{ on, attrs }">
 						<button v-bind="attrs" v-on="on" type="button" class="tw-quickadd__action" :disabled="submitting">
 							<v-icon size="14" aria-hidden="true">mdi-calendar</v-icon>
-							{{ parsed.due ? displayDate(parsed.due) : 'Date' }}
+							{{ parsed.scheduled ? displayDate(parsed.scheduled) : 'Schedule' }}
 						</button>
 					</template>
 					<v-list dense>
-						<v-list-item v-for="dateAction in dateActions" :key="dateAction.value" @click="selectDateAction(dateAction.value)">
+						<v-list-item v-for="dateAction in dateActions" :key="dateAction.value" @click="selectScheduledAction(dateAction.value)">
+							<v-list-item-title>{{ dateAction.label }}</v-list-item-title>
+						</v-list-item>
+					</v-list>
+				</v-menu>
+				<v-menu offset-y>
+					<template v-slot:activator="{ on, attrs }">
+						<button v-bind="attrs" v-on="on" type="button" class="tw-quickadd__action" :disabled="submitting">
+							<v-icon size="14" aria-hidden="true">mdi-calendar</v-icon>
+							{{ parsed.due ? displayDate(parsed.due) : 'Deadline' }}
+						</button>
+					</template>
+					<v-list dense>
+						<v-list-item v-for="dateAction in dateActions" :key="dateAction.value" @click="selectDueAction(dateAction.value)">
 							<v-list-item-title>{{ dateAction.label }}</v-list-item-title>
 						</v-list-item>
 					</v-list>
@@ -62,11 +77,11 @@
 						</v-list-item>
 					</v-list>
 				</v-menu>
-				<button type="button" class="tw-quickadd__action" :disabled="submitting" @click="insertSyntax('+')">
+				<button type="button" class="tw-quickadd__action" :disabled="submitting || batchMode" @click="insertSyntax('+')">
 					<v-icon size="14" aria-hidden="true">mdi-account-outline</v-icon>
 					{{ resolvedAssigneeLabel || 'Assignee' }}
 				</button>
-				<button type="button" class="tw-quickadd__action" :disabled="submitting" @click="insertSyntax('%')">
+				<button type="button" class="tw-quickadd__action" :disabled="submitting || batchMode" @click="insertSyntax('%')">
 					<v-icon size="14" aria-hidden="true">mdi-tag-outline</v-icon>
 					Labels
 				</button>
@@ -83,11 +98,19 @@
 						</v-list-item>
 					</v-list>
 				</v-menu>
+				<button type="button" class="tw-quickadd__action" :disabled="submitting || batchMode" @click="insertSyntax('!')">
+					<v-icon size="14" aria-hidden="true">mdi-bell-outline</v-icon>
+					Reminder
+				</button>
+				<button type="button" class="tw-quickadd__action" :disabled="submitting || batchMode" @click="insertSyntax('durante ')">
+					<v-icon size="14" aria-hidden="true">mdi-timer-outline</v-icon>
+					Duration
+				</button>
 				<button
 					type="button"
 					class="tw-quickadd__action"
 					:class="{ 'tw-quickadd__action--active': detailsOpen }"
-					:disabled="submitting"
+					:disabled="submitting || batchMode"
 					@click="showDescription"
 				>
 					<v-icon size="14" aria-hidden="true">mdi-pencil-outline</v-icon>
@@ -95,7 +118,35 @@
 				</button>
 			</div>
 
-			<div v-if="detailsOpen" class="tw-quickadd__details">
+			<div v-if="batchMode" class="tw-quickadd__batch" aria-live="polite">
+				<div class="tw-quickadd__batch-head">
+					<span>{{ batchLines.length }} tasks ready to add</span>
+					<span v-if="batchHasErrors" class="tw-quickadd__batch-error">Review highlighted tasks</span>
+				</div>
+				<div class="tw-quickadd__batch-list">
+					<div
+						v-for="(item, index) in batchParsed"
+						:key="index + '-' + batchLines[index]"
+						class="tw-quickadd__batch-item"
+						:class="{ 'tw-quickadd__batch-item--error': !isParsedTaskValid(item) }"
+					>
+						<span class="tw-quickadd__batch-text">{{ item.description || batchLines[index] }}</span>
+						<span class="tw-quickadd__batch-meta">{{ batchMeta(item) }}</span>
+						<button type="button" title="Remove task" :disabled="submitting" @click="removeBatchLine(index)">
+							<v-icon size="15" aria-hidden="true">mdi-close</v-icon>
+						</button>
+					</div>
+				</div>
+				<div class="tw-quickadd__batch-actions">
+					<button type="button" :disabled="submitting" @click="cancelBatch">Cancel</button>
+					<button type="button" :disabled="submitting" @click="keepBatchAsOne">Keep as one task</button>
+					<button type="button" class="tw-quickadd__batch-submit" :disabled="submitting || batchHasErrors" @click="submitBatch">
+						Add {{ batchLines.length }} tasks
+					</button>
+				</div>
+			</div>
+
+			<div v-if="detailsOpen && !batchMode" class="tw-quickadd__details">
 				<textarea
 					ref="detailsRef"
 					v-model="details"
@@ -119,7 +170,7 @@
 				</button>
 			</div>
 
-			<div v-if="suggestions.length" class="tw-palette__results" role="listbox">
+			<div v-if="suggestions.length && !batchMode" class="tw-palette__results" role="listbox">
 				<button
 					v-for="(s, i) in suggestions"
 					:key="suggestionKey(s)"
@@ -141,7 +192,7 @@
 				</button>
 			</div>
 
-			<div v-if="hasParsedMeta" class="tw-quickadd__preview">
+			<div v-if="hasParsedMeta && !batchMode" class="tw-quickadd__preview">
 				<button
 					v-if="parsed.recur"
 					type="button"
@@ -201,6 +252,29 @@
 					{{ displayDate(parsed.due) }}
 					<v-icon size="11" aria-hidden="true">mdi-close</v-icon>
 				</button>
+				<button
+					v-if="parsed.scheduled"
+					type="button"
+					class="tw-quickadd__chip tw-quickadd__chip--interactive"
+					title="Remove scheduled date"
+					@click="treatScheduledAsText"
+				>
+					<v-icon size="12" aria-hidden="true">mdi-calendar</v-icon>
+					planned {{ displayDate(parsed.scheduled) }}
+					<v-icon size="11" aria-hidden="true">mdi-close</v-icon>
+				</button>
+				<span v-if="parsed.until" class="tw-quickadd__chip">
+					<v-icon size="12" aria-hidden="true">mdi-calendar</v-icon>
+					until {{ displayDate(parsed.until) }}
+				</span>
+				<span v-if="parsed.reminder" class="tw-quickadd__chip">
+					<v-icon size="12" aria-hidden="true">mdi-bell-outline</v-icon>
+					remind {{ displayDate(parsed.reminder) }}
+				</span>
+				<span v-if="parsed.durationMinutes" class="tw-quickadd__chip">
+					<v-icon size="12" aria-hidden="true">mdi-timer-outline</v-icon>
+					{{ displayDuration(parsed.durationMinutes) }}
+				</span>
 				<span v-if="parsed.dateError" class="tw-quickadd__chip tw-quickadd__chip--error">
 					<v-icon size="12" aria-hidden="true">mdi-alert-circle-outline</v-icon>
 					Conflicting dates
@@ -216,6 +290,14 @@
 					{{ parsed.recurrenceError === 'ambiguous' ? 'Conflicting recurrences' : 'Unsupported recurrence' }}
 					<v-icon size="11" aria-hidden="true">mdi-close</v-icon>
 				</button>
+				<span v-if="parsed.reminderError" class="tw-quickadd__chip tw-quickadd__chip--error">
+					<v-icon size="12" aria-hidden="true">mdi-alert-circle-outline</v-icon>
+					{{ parsed.reminderError === 'ambiguous' ? 'Conflicting reminders' : 'Invalid reminder' }}
+				</span>
+				<span v-if="parsed.durationError" class="tw-quickadd__chip tw-quickadd__chip--error">
+					<v-icon size="12" aria-hidden="true">mdi-alert-circle-outline</v-icon>
+					Conflicting durations
+				</span>
 			</div>
 
 			<div class="tw-palette__hint">
@@ -225,10 +307,13 @@
 					<span class="tw-palette__hint-pair"><kbd>+</kbd>person</span>
 					<span class="tw-palette__hint-pair"><kbd>p1-p4</kbd>priority</span>
 					<span class="tw-palette__hint-pair"><kbd>cada lunes</kbd>repeat</span>
+					<span class="tw-palette__hint-pair"><kbd>{29/8}</kbd>deadline</span>
+					<span class="tw-palette__hint-pair"><kbd>!30m</kbd>reminder</span>
 				</span>
 				<span class="tw-palette__hint-keys">
 					<span class="tw-palette__hint-pair"><kbd>↓</kbd>description</span>
 					<span class="tw-palette__hint-pair"><kbd>↵</kbd>add</span>
+					<span class="tw-palette__hint-pair"><kbd>⇧↵</kbd>add another</span>
 					<span class="tw-palette__hint-pair"><kbd>Esc</kbd>close</span>
 				</span>
 			</div>
@@ -241,10 +326,21 @@ import { defineComponent, useStore, computed, ref, watch, nextTick } from '@nuxt
 import { Task } from 'taskwarrior-lib';
 import moment from 'moment';
 import { accessorType, TaskWithProfile } from '../store';
-import { applyQuickAddOverrides, parseQuickAdd } from '../utils/quickAddParse';
+import {
+	applyQuickAddOverrides,
+	durationMinutesToIso,
+	ParsedQuickAdd,
+	parseQuickAdd
+} from '../utils/quickAddParse';
 import { combineDateTime, parseDateToken } from '../utils/dateParse';
 import { memberLabel, ProfileMember, resolveAssignee } from '../utils/assignee';
 import { buildQuickAddAnnotations } from '../utils/quickAddAnnotations';
+import {
+	composeQuickAddBatch,
+	composeQuickAddSingle,
+	quickAddBatchUuid,
+	quickAddPasteLines
+} from '../utils/quickAddBatch';
 
 interface Suggestion {
 	text: string;
@@ -271,6 +367,12 @@ function priorityNumber(priority: 'H' | 'M' | 'L') {
 	return priority === 'H' ? 1 : priority === 'M' ? 2 : 3;
 }
 
+function displayDuration(minutes: number) {
+	const hours = Math.floor(minutes / 60);
+	const remainder = minutes % 60;
+	return [hours ? `${hours}h` : '', remainder ? `${remainder}m` : ''].filter(Boolean).join(' ');
+}
+
 export default defineComponent({
 	setup() {
 		const store = useStore<typeof accessorType>();
@@ -290,8 +392,12 @@ export default defineComponent({
 		const smartDates = ref(true);
 		const smartRecurrences = ref(true);
 		const dueOverride = ref<string | null>(null);
+		const scheduledOverride = ref<string | null>(null);
 		const recurrenceOverride = ref<{ recur: string, due: string } | null>(null);
 		const priorityOverride = ref<{ value?: 'H' | 'M' | 'L', label: string } | null>(null);
+		const batchLines = ref<string[]>([]);
+		const batchUuids = ref<string[]>([]);
+		const batchSingleText = ref('');
 		const cursorPos = ref(0);
 		const activeIdx = ref(0);
 		const inputRef = ref<HTMLInputElement | null>(null);
@@ -404,17 +510,42 @@ export default defineComponent({
 				.slice(0, 6);
 		});
 
-		const parsed = computed(() => {
-			const base = parseQuickAdd(text.value, {
+		const parseWithOverrides = (value: string): ParsedQuickAdd => {
+			const base = parseQuickAdd(value, {
 				parseDates: smartDates.value,
 				parseRecurrences: smartRecurrences.value
 			});
 			return applyQuickAddOverrides(base, {
 				...(priorityOverride.value ? { priority: priorityOverride.value.value ?? null } : {}),
 				...(recurrenceOverride.value ? { recurrence: recurrenceOverride.value } : {}),
-				...(dueOverride.value ? { due: dueOverride.value } : {})
+				...(dueOverride.value ? { due: dueOverride.value } : {}),
+				...(scheduledOverride.value ? { scheduled: scheduledOverride.value } : {})
 			});
-		});
+		};
+		const parsed = computed(() => parseWithOverrides(text.value));
+		const batchParsed = computed(() => batchLines.value.map(parseWithOverrides));
+		const batchMode = computed(() => batchLines.value.length > 0);
+		const isParsedTaskValid = (item: ParsedQuickAdd) =>
+			Boolean(item.description)
+			&& !item.dateError
+			&& !item.recurrenceError
+			&& !item.reminderError
+			&& !item.durationError;
+		const batchHasErrors = computed(() => batchParsed.value.some(item => !isParsedTaskValid(item)));
+		const batchMeta = (item: ParsedQuickAdd) => [
+			item.project ? `#${item.project}` : '',
+			...item.tags.map(tag => `%${tag}`),
+			item.priority ? `P${priorityNumber(item.priority)}` : '',
+			item.scheduled ? `planned ${displayDate(item.scheduled)}` : '',
+			item.due ? `due ${displayDate(item.due)}` : '',
+			item.recur || '',
+			item.reminder ? `remind ${displayDate(item.reminder)}` : '',
+			item.durationMinutes ? displayDuration(item.durationMinutes) : '',
+			item.dateError ? 'conflicting dates' : '',
+			item.recurrenceError ? 'invalid recurrence' : '',
+			item.reminderError ? 'invalid reminder' : '',
+			item.durationError ? 'invalid duration' : ''
+		].filter(Boolean).join(' · ');
 		const dateActions = [
 			{ label: 'Today', value: 'today' },
 			{ label: 'Tomorrow', value: 'tomorrow' },
@@ -428,13 +559,15 @@ export default defineComponent({
 		const recurrenceActions = [
 			{ label: 'Every day', value: 'every day' },
 			{ label: 'Every weekday', value: 'every weekday' },
+			{ label: 'Every weekend', value: 'every weekend' },
 			{ label: 'Every week', value: 'every week' },
+			{ label: 'Every two weeks', value: 'every two weeks' },
 			{ label: 'Every month', value: 'every month' },
+			{ label: 'Every quarter', value: 'every quarter' },
 			{ label: 'Every year', value: 'every year' }
 		];
 
-		const projectTargetProfile = computed(() => {
-			const project = parsed.value.project;
+		const targetProfileForProject = (project?: string) => {
 			if (!project) return activeProfile.value || undefined;
 			if (
 				selectedProject.value
@@ -448,7 +581,8 @@ export default defineComponent({
 			if (matches.includes(activeProfile.value)) return activeProfile.value;
 			const unique = Array.from(new Set(matches));
 			return unique.length === 1 ? unique[0] : activeProfile.value || undefined;
-		});
+		};
+		const projectTargetProfile = computed(() => targetProfileForProject(parsed.value.project));
 
 		const hasParsedMeta = computed(() =>
 			Boolean(parsed.value.project)
@@ -456,9 +590,15 @@ export default defineComponent({
 			|| parsed.value.tags.length > 0
 			|| Boolean(parsed.value.priority)
 			|| Boolean(parsed.value.due)
+			|| Boolean(parsed.value.scheduled)
+			|| Boolean(parsed.value.until)
 			|| Boolean(parsed.value.recur)
+			|| Boolean(parsed.value.reminder)
+			|| Boolean(parsed.value.durationMinutes)
 			|| Boolean(parsed.value.dateError)
 			|| Boolean(parsed.value.recurrenceError)
+			|| Boolean(parsed.value.reminderError)
+			|| Boolean(parsed.value.durationError)
 		);
 
 		const resolvedAssignee = computed(() =>
@@ -478,6 +618,8 @@ export default defineComponent({
 				&& Boolean(p.description)
 				&& !p.dateError
 				&& !p.recurrenceError
+				&& !p.reminderError
+				&& !p.durationError
 				&& (!p.assignee || Boolean(resolvedAssignee.value));
 		});
 
@@ -494,8 +636,12 @@ export default defineComponent({
 				smartDates.value = true;
 				smartRecurrences.value = true;
 				dueOverride.value = null;
+				scheduledOverride.value = null;
 				recurrenceOverride.value = null;
 				priorityOverride.value = null;
+				batchLines.value = [];
+				batchUuids.value = [];
+				batchSingleText.value = '';
 				cursorPos.value = 0;
 				activeIdx.value = 0;
 				submitting.value = false;
@@ -551,6 +697,7 @@ export default defineComponent({
 		};
 
 		const onDown = () => {
+			if (batchMode.value) return;
 			if (!suggestions.value.length) {
 				showDescription();
 				return;
@@ -570,12 +717,54 @@ export default defineComponent({
 			applySuggestion(suggestions.value[activeIdx.value]);
 		};
 
-		const onEnter = () => {
+		const onEnter = (event: KeyboardEvent) => {
+			if (batchMode.value) {
+				submitBatch();
+				return;
+			}
 			if (suggestions.value.length) {
 				applySuggestion(suggestions.value[activeIdx.value]);
 				return;
 			}
-			submit();
+			submit(event.shiftKey);
+		};
+
+		const onPaste = (event: ClipboardEvent) => {
+			const pasted = event.clipboardData?.getData('text/plain') || '';
+			const lines = quickAddPasteLines(pasted);
+			if (lines.length < 2) return;
+			if (lines.length > 100) {
+				event.preventDefault();
+				store.commit('setNotification', {
+					color: 'error',
+					text: 'Quick Add accepts up to 100 tasks at once'
+				});
+				return;
+			}
+			event.preventDefault();
+			const el = inputRef.value;
+			const start = el?.selectionStart ?? text.value.length;
+			const end = el?.selectionEnd ?? start;
+			batchLines.value = composeQuickAddBatch(text.value, start, end, lines);
+			batchUuids.value = batchLines.value.map(() => quickAddBatchUuid());
+			batchSingleText.value = composeQuickAddSingle(text.value, start, end, lines);
+		};
+
+		const removeBatchLine = (index: number) => {
+			batchLines.value = batchLines.value.filter((_, i) => i !== index);
+			batchUuids.value = batchUuids.value.filter((_, i) => i !== index);
+		};
+
+		const cancelBatch = () => {
+			batchLines.value = [];
+			batchUuids.value = [];
+			batchSingleText.value = '';
+			focusInput();
+		};
+
+		const keepBatchAsOne = () => {
+			text.value = batchSingleText.value;
+			cancelBatch();
 		};
 
 		const suggestionKey = (s: Suggestion) => `${s.profile || ''}::${s.email || s.text}`;
@@ -596,14 +785,23 @@ export default defineComponent({
 
 		const focusInput = () => nextTick(() => inputRef.value?.focus());
 
-		const selectDateAction = (value: string) => {
+		const dateWithCurrentTime = (value: string, currentValue?: string) => {
 			const date = parseDateToken(value);
-			if (!date) return;
-			const current = parsed.value.due ? moment(parsed.value.due) : null;
-			const hasTime = current?.isValid() && /T\d{2}:\d{2}/.test(parsed.value.due || '');
-			dueOverride.value = hasTime
+			if (!date) return null;
+			const current = currentValue ? moment(currentValue) : null;
+			const hasTime = current?.isValid() && /T\d{2}:\d{2}/.test(currentValue || '');
+			return hasTime
 				? combineDateTime(date, { hours: current!.hour(), minutes: current!.minute() })
 				: date;
+		};
+
+		const selectDueAction = (value: string) => {
+			dueOverride.value = dateWithCurrentTime(value, parsed.value.due);
+			focusInput();
+		};
+
+		const selectScheduledAction = (value: string) => {
+			scheduledOverride.value = dateWithCurrentTime(value, parsed.value.scheduled);
 			focusInput();
 		};
 
@@ -629,6 +827,11 @@ export default defineComponent({
 		const treatDateAsText = () => {
 			if (dueOverride.value) dueOverride.value = null;
 			else smartDates.value = false;
+			focusInput();
+		};
+
+		const treatScheduledAsText = () => {
+			scheduledOverride.value = null;
 			focusInput();
 		};
 
@@ -662,46 +865,113 @@ export default defineComponent({
 			});
 		};
 
-		const submit = async () => {
-			if (submitting.value) return;
-			const p = parsed.value;
-			if (!p.description || p.dateError || p.recurrenceError) return;
-			if (p.assignee && !resolvedAssignee.value) {
-				store.commit('setNotification', {
-					color: 'error',
-					text: 'Unknown assignee'
-				});
-				return;
-			}
-			submitting.value = true;
-			// Route the write explicitly; otherwise the backend falls back to the
-			// user's first allowed profile, which can differ from the intended one.
-			const payload: TaskWithProfile = {
-				_profile: projectTargetProfile.value || activeProfile.value || undefined,
+		const ensureMembersForProfile = async (profile?: string) => {
+			if (!profile || profile === activeProfile.value || memberCache.value[profile]) return;
+			const members = await store.dispatch('fetchMembersFor', profile) as ProfileMember[];
+			memberCache.value = { ...memberCache.value, [profile]: members };
+		};
+
+		const payloadForParsed = (p: ParsedQuickAdd, uuid?: string): TaskWithProfile => {
+			const profile = targetProfileForProject(p.project);
+			const members = !profile || profile === activeProfile.value
+				? store.state.members
+				: memberCache.value[profile] || [];
+			const assignee = resolveAssignee(p.assignee, members);
+			if (p.assignee && !assignee) throw new Error(`Unknown assignee: ${p.assignee}`);
+			return {
+				uuid,
+				_profile: profile,
 				description: p.description,
 				project: p.project,
 				tags: p.tags.length ? p.tags : undefined,
-				assignee: resolvedAssignee.value,
+				assignee,
 				priority: p.priority,
 				due: p.due,
+				scheduled: p.scheduled,
+				until: p.until,
 				recur: p.recur,
+				twui_reminder: p.reminder,
+				twui_duration: p.durationMinutes ? durationMinutesToIso(p.durationMinutes) : undefined,
 				annotations: buildQuickAddAnnotations(details.value)
 			};
+		};
+
+		const clearDraftAndFocus = async () => {
+			text.value = '';
+			details.value = '';
+			detailsOpen.value = false;
+			smartDates.value = true;
+			smartRecurrences.value = true;
+			dueOverride.value = null;
+			scheduledOverride.value = null;
+			recurrenceOverride.value = null;
+			priorityOverride.value = null;
+			batchLines.value = [];
+			batchUuids.value = [];
+			batchSingleText.value = '';
+			selectedProject.value = null;
+			cursorPos.value = 0;
+			await nextTick();
+			inputRef.value?.focus();
+		};
+
+		const submit = async (keepOpen = false) => {
+			if (submitting.value) return;
+			const p = parsed.value;
+			if (!p.description || p.dateError || p.recurrenceError || p.reminderError || p.durationError) return;
+			submitting.value = true;
 			try {
+				await ensureMembersForProfile(targetProfileForProject(p.project));
+				const payload = payloadForParsed(p);
 				await store.dispatch('updateTasks', [payload]);
 				store.commit('setNotification', {
 					color: 'success',
 					text: 'Task added'
 				});
 				submitting.value = false;
-				close();
+				if (keepOpen) await clearDraftAndFocus();
+				else close();
 			}
 			catch (err) {
 				// Keep the palette open with the user's input intact so they can retry
 				// without re-typing — closing on error would silently lose the entry.
 				store.commit('setNotification', {
 					color: 'error',
-					text: 'Failed to add task'
+					text: (err as Error).message.startsWith('Unknown assignee:')
+						? (err as Error).message
+						: 'Failed to add task'
+				});
+			}
+			finally {
+				submitting.value = false;
+			}
+		};
+
+		const submitBatch = async () => {
+			if (submitting.value || batchHasErrors.value || !batchParsed.value.length) return;
+			submitting.value = true;
+			try {
+				const profiles = Array.from(new Set(batchParsed.value.map(item =>
+					targetProfileForProject(item.project)
+				)));
+				for (const profile of profiles) await ensureMembersForProfile(profile);
+				const payloads = batchParsed.value.map((item, index) =>
+					payloadForParsed(item, batchUuids.value[index])
+				);
+				await store.dispatch('updateTasks', payloads);
+				store.commit('setNotification', {
+					color: 'success',
+					text: `${payloads.length} tasks added`
+				});
+				submitting.value = false;
+				close();
+			}
+			catch (err) {
+				store.commit('setNotification', {
+					color: 'error',
+					text: (err as Error).message.startsWith('Unknown assignee:')
+						? (err as Error).message
+						: 'Failed to add tasks'
 				});
 			}
 			finally {
@@ -722,6 +992,12 @@ export default defineComponent({
 			suggestionKey,
 			activeIdx,
 			parsed,
+			batchLines,
+			batchParsed,
+			batchMode,
+			batchHasErrors,
+			batchMeta,
+			isParsedTaskValid,
 			dateActions,
 			priorityActions,
 			priorityActionLabel,
@@ -733,6 +1009,7 @@ export default defineComponent({
 			resolvedAssigneeLabel,
 			canSubmit,
 			displayDate,
+			displayDuration,
 			priorityNumber,
 			close,
 			showDescription,
@@ -740,12 +1017,19 @@ export default defineComponent({
 			onUp,
 			onTab,
 			onEnter,
+			onPaste,
 			insertSyntax,
-			selectDateAction,
+			selectDueAction,
+			selectScheduledAction,
 			selectPriorityAction,
 			selectRecurrenceAction,
 			treatDateAsText,
+			treatScheduledAsText,
 			treatRecurrenceAsText,
+			removeBatchLine,
+			cancelBatch,
+			keepBatchAsOne,
+			submitBatch,
 			applySuggestion,
 			syncCursor,
 			submit,

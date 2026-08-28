@@ -23,6 +23,8 @@ export interface ParsedRecurrencePhrase {
 	recur: string;
 	due: string;
 	consumed: number;
+	until?: string;
+	error?: 'invalid-range' | 'invalid-modifier' | 'ambiguous-modifier';
 }
 
 // Strip diacritics so Spanish tokens compare the same with or without accents
@@ -407,6 +409,10 @@ const RECURRENCE_UNITS: Record<string, { single: string, counted: string }> = {
 	months: { single: 'monthly', counted: 'months' },
 	mes: { single: 'monthly', counted: 'months' },
 	meses: { single: 'monthly', counted: 'months' },
+	quarter: { single: 'quarterly', counted: 'quarters' },
+	quarters: { single: 'quarterly', counted: 'quarters' },
+	trimestre: { single: 'quarterly', counted: 'quarters' },
+	trimestres: { single: 'quarterly', counted: 'quarters' },
 	year: { single: 'yearly', counted: 'years' },
 	years: { single: 'yearly', counted: 'years' },
 	ano: { single: 'yearly', counted: 'years' },
@@ -418,8 +424,15 @@ const STANDALONE_RECURRENCES: Record<string, string> = {
 	diaria: 'daily',
 	weekly: 'weekly',
 	semanal: 'weekly',
+	biweekly: 'biweekly',
+	fortnightly: 'biweekly',
+	quincenal: 'biweekly',
 	monthly: 'monthly',
 	mensual: 'monthly',
+	quarterly: 'quarterly',
+	trimestral: 'quarterly',
+	semiannual: 'semiannual',
+	semestral: 'semiannual',
 	yearly: 'yearly',
 	annually: 'yearly',
 	annual: 'yearly',
@@ -432,38 +445,92 @@ const STANDALONE_RECURRENCES: Record<string, string> = {
 export function parseRecurrencePhrase(tokens: string[], index: number): ParsedRecurrencePhrase | undefined {
 	const first = deaccent(trimTokenPunctuation(tokens[index] ?? '').toLowerCase());
 	const standalone = STANDALONE_RECURRENCES[first];
-	if (standalone) {
-		return { recur: standalone, due: moment().format('YYYY-MM-DD'), consumed: 1 };
-	}
-	if (!RECURRENCE_PREFIX_WORDS.has(first)) return undefined;
+	let parsed: ParsedRecurrencePhrase | undefined = standalone
+		? { recur: standalone, due: moment().format('YYYY-MM-DD'), consumed: 1 }
+		: undefined;
+	if (!parsed && !RECURRENCE_PREFIX_WORDS.has(first)) return undefined;
 
 	const valueIndex = index + 1;
 	const value = deaccent(trimTokenPunctuation(tokens[valueIndex] ?? '').toLowerCase());
-	if (!value) return undefined;
-
-	if (value === 'weekday' || value === 'weekdays' || value === 'laborable' || value === 'laborables') {
+	if (!parsed && !value) return undefined;
+	if (!parsed && (value === 'weekday' || value === 'weekdays' || value === 'laborable' || value === 'laborables')) {
 		const firstWeekday = moment().startOf('day');
 		if (firstWeekday.day() === 6) firstWeekday.add(2, 'days');
 		else if (firstWeekday.day() === 0) firstWeekday.add(1, 'day');
-		return { recur: 'weekdays', due: firstWeekday.format('YYYY-MM-DD'), consumed: 2 };
+		parsed = { recur: 'weekdays', due: firstWeekday.format('YYYY-MM-DD'), consumed: 2 };
 	}
+	if (!parsed && (value === 'weekend' || value === 'finde' || value === 'finsemana')) {
+		parsed = { recur: 'weekly', due: parseDateToken('weekend')!, consumed: 2 };
+	}
+	if (
+		!parsed
+		&& value === 'fin'
+		&& deaccent(trimTokenPunctuation(tokens[valueIndex + 1] ?? '').toLowerCase()) === 'de'
+		&& deaccent(trimTokenPunctuation(tokens[valueIndex + 2] ?? '').toLowerCase()) === 'semana'
+	) {
+		parsed = { recur: 'weekly', due: parseDateToken('weekend')!, consumed: 4 };
+	}
+	if (!parsed) {
+		const unit = RECURRENCE_UNITS[value];
+		if (unit) parsed = { recur: unit.single, due: moment().format('YYYY-MM-DD'), consumed: 2 };
+	}
+	if (!parsed) {
+		const weekdayDue = dayIndexOf(value) !== -1 ? parseDateToken(value) : undefined;
+		if (weekdayDue) parsed = { recur: 'weekly', due: weekdayDue, consumed: 2 };
+	}
+	if (!parsed) {
+		const count = relativeCountFrom(tokens, valueIndex);
+		if (count) {
+			const countedUnitToken = deaccent(trimTokenPunctuation(tokens[valueIndex + count.length] ?? '').toLowerCase());
+			const countedUnit = RECURRENCE_UNITS[countedUnitToken];
+			if (countedUnit) {
+				parsed = {
+					recur: count.count === 1 ? countedUnit.single : `${count.count}${countedUnit.counted}`,
+					due: moment().format('YYYY-MM-DD'),
+					consumed: 1 + count.length + 1
+				};
+			}
+		}
+	}
+	if (!parsed) return undefined;
 
-	const unit = RECURRENCE_UNITS[value];
-	if (unit) return { recur: unit.single, due: moment().format('YYYY-MM-DD'), consumed: 2 };
-
-	const weekdayDue = dayIndexOf(value) !== -1 ? parseDateToken(value) : undefined;
-	if (weekdayDue) return { recur: 'weekly', due: weekdayDue, consumed: 2 };
-
-	const count = relativeCountFrom(tokens, valueIndex);
-	if (!count) return undefined;
-	const countedUnitToken = deaccent(trimTokenPunctuation(tokens[valueIndex + count.length] ?? '').toLowerCase());
-	const countedUnit = RECURRENCE_UNITS[countedUnitToken];
-	if (!countedUnit) return undefined;
-	return {
-		recur: count.count === 1 ? countedUnit.single : `${count.count}${countedUnit.counted}`,
-		due: moment().format('YYYY-MM-DD'),
-		consumed: 1 + count.length + 1
-	};
+	const startWords = new Set(['starting', 'from', 'desde', 'empezando', 'comenzando']);
+	const endWords = new Set(['until', 'ending', 'hasta']);
+	const connectors = new Set(['on', 'el', 'en']);
+	let cursor = index + parsed.consumed;
+	let sawStart = false;
+	let sawEnd = false;
+	while (cursor < tokens.length) {
+		const modifier = deaccent(trimTokenPunctuation(tokens[cursor]).toLowerCase());
+		const isStart = startWords.has(modifier);
+		const isEnd = endWords.has(modifier);
+		if (!isStart && !isEnd) break;
+		let dateIndex = cursor + 1;
+		if (connectors.has(deaccent(trimTokenPunctuation(tokens[dateIndex] ?? '').toLowerCase()))) dateIndex++;
+		const date = parseDateToken(tokens[dateIndex] ?? '');
+		parsed.consumed = dateIndex - index + (tokens[dateIndex] ? 1 : 0);
+		if (!date) {
+			parsed.error = 'invalid-modifier';
+			return parsed;
+		}
+		if ((isStart && sawStart) || (isEnd && sawEnd)) {
+			parsed.error = 'ambiguous-modifier';
+			return parsed;
+		}
+		if (isStart) {
+			sawStart = true;
+			parsed.due = date;
+		}
+		else {
+			sawEnd = true;
+			parsed.until = date;
+		}
+		cursor = dateIndex + 1;
+	}
+	if (parsed.until && moment(parsed.until).isBefore(moment(parsed.due), 'day')) {
+		parsed.error = 'invalid-range';
+	}
+	return parsed;
 }
 
 // Collapses multi-word date phrases into the single tokens parseDateToken understands,
