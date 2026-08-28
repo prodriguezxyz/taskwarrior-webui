@@ -6,7 +6,7 @@ import {
 	parseDateTimeInput,
 	parseDateToken
 } from '../utils/dateParse';
-import { parseQuickAdd } from '../utils/quickAddParse';
+import { applyQuickAddOverrides, parseQuickAdd } from '../utils/quickAddParse';
 
 moment.now = () => Date.UTC(2026, 6, 21, 12, 0, 0);
 
@@ -25,12 +25,27 @@ for (const [input, expected] of validNumericDates) {
 	assert.strictEqual(parseDateInput(input), expected, input);
 }
 
+const validPartialNumericDates: Array<[string, string]> = [
+	['29/8', '2026-08-29'],
+	['29-8', '2026-08-29'],
+	['21/7', '2026-07-21'],
+	['1/2', '2027-02-01'],
+	['29/2', '2028-02-29']
+];
+
+for (const [input, expected] of validPartialNumericDates) {
+	assert.strictEqual(parseDateToken(input), expected, input);
+	assert.strictEqual(parseDateInput(input), expected, input);
+}
+
 const invalidNumericDates = [
 	'00/01/2027',
 	'01/00/2027',
 	'29/02/2027',
 	'31/04/2027',
 	'12/31/2027',
+	'31/4',
+	'12/31',
 	'01/02-2027',
 	'01.02.2027',
 	'01/02/27'
@@ -132,6 +147,11 @@ assert.deepStrictEqual(parseQuickAdd('Revisar 31/02/2027'), {
 	description: 'Revisar 31/02/2027',
 	tags: []
 });
+assert.deepStrictEqual(parseQuickAdd('Revisar informe 29/8'), {
+	description: 'Revisar informe',
+	tags: [],
+	due: '2026-08-29'
+});
 assert.deepStrictEqual(parseQuickAdd('Comprar por la mañana'), {
 	description: 'Comprar por la mañana',
 	tags: []
@@ -146,5 +166,142 @@ assert.deepStrictEqual(parseQuickAdd('Tarea tomorrow mañana'), {
 	tags: [],
 	due: '2026-07-22'
 });
+assert.deepStrictEqual(parseQuickAdd('Enviar parte cada lunes a las 9'), {
+	description: 'Enviar parte',
+	tags: [],
+	due: '2026-07-27T09:00:00+02:00',
+	recur: 'weekly'
+});
+assert.deepStrictEqual(parseQuickAdd('Revisar objetivos cada dos semanas %trabajo'), {
+	description: 'Revisar objetivos',
+	tags: ['trabajo'],
+	due: '2026-07-21',
+	recur: '2weeks'
+});
+const weekdayNow = moment.now;
+moment.now = () => Date.UTC(2026, 6, 25, 12, 0, 0);
+assert.deepStrictEqual(parseQuickAdd('Procesar bandeja cada laborable'), {
+	description: 'Procesar bandeja',
+	tags: [],
+	due: '2026-07-27',
+	recur: 'weekdays'
+});
+moment.now = weekdayNow;
+assert.deepStrictEqual(parseQuickAdd('Preparar informe mensual'), {
+	description: 'Preparar informe',
+	tags: [],
+	due: '2026-07-21',
+	recur: 'monthly'
+});
+assert.deepStrictEqual(parseQuickAdd('Preparar informe mensual', {
+	parseDates: false,
+	parseRecurrences: false
+}), {
+	description: 'Preparar informe mensual',
+	tags: []
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea cada fin de semana'), {
+	description: 'Tarea cada fin de semana',
+	tags: [],
+	recurrenceError: 'unsupported'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea cada fin de semana', { parseRecurrences: false }), {
+	description: 'Tarea cada fin de semana',
+	tags: []
+});
+for (const unsupported of [
+	'every other Tuesday',
+	'every last Friday',
+	'cada próximo lunes',
+	'cada primer miércoles',
+	'every 2nd Monday'
+]) {
+	assert.deepStrictEqual(parseQuickAdd(`Tarea ${unsupported}`), {
+		description: `Tarea ${unsupported}`,
+		tags: [],
+		recurrenceError: 'unsupported'
+	}, unsupported);
+}
+assert.deepStrictEqual(parseQuickAdd('Tarea every day every week'), {
+	description: 'Tarea',
+	tags: [],
+	due: '2026-07-21',
+	recur: 'daily',
+	recurrenceError: 'ambiguous'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea every day every week', { parseRecurrences: false }), {
+	description: 'Tarea every day every week',
+	tags: []
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea mañana cada lunes', { parseDates: false }), {
+	description: 'Tarea mañana',
+	tags: [],
+	due: '2026-07-27',
+	recur: 'weekly'
+});
+assert.deepStrictEqual(parseQuickAdd('Tarea every day tomorrow', { parseRecurrences: false }), {
+	description: 'Tarea every day',
+	tags: [],
+	due: '2026-07-22'
+});
+assert.deepStrictEqual(parseQuickAdd('Añadir 1/2 taza de agua'), {
+	description: 'Añadir 1/2 taza de agua',
+	tags: []
+});
+assert.deepStrictEqual(parseQuickAdd('Preparar reunión 1/2'), {
+	description: 'Preparar reunión',
+	tags: [],
+	due: '2027-02-01'
+});
+assert.deepStrictEqual(parseQuickAdd('Preparar reunión 1/2 #trabajo %agenda p2'), {
+	description: 'Preparar reunión',
+	project: 'trabajo',
+	tags: ['agenda'],
+	priority: 'M',
+	due: '2027-02-01'
+});
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea today tomorrow p1'), {
+		due: '2026-07-24',
+		priority: null
+	}),
+	{
+		description: 'Tarea',
+		tags: [],
+		due: '2026-07-24'
+	}
+);
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea every day every week'), {
+		recurrence: { recur: 'monthly', due: '2026-08-01' }
+	}),
+	{
+		description: 'Tarea',
+		tags: [],
+		due: '2026-08-01',
+		recur: 'monthly'
+	}
+);
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea mañana', { parseDates: false }), {
+		due: '2026-07-24'
+	}),
+	{
+		description: 'Tarea mañana',
+		tags: [],
+		due: '2026-07-24'
+	}
+);
+assert.deepStrictEqual(
+	applyQuickAddOverrides(parseQuickAdd('Tarea every day', { parseRecurrences: false }), {
+		recurrence: { recur: 'monthly', due: '2026-08-01' }
+	}),
+	{
+		description: 'Tarea every day',
+		tags: [],
+		due: '2026-08-01',
+		recur: 'monthly'
+	}
+);
 
 console.log('date parser tests passed');

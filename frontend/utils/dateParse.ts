@@ -19,6 +19,12 @@ export interface ParsedDateTimeInput {
 	error?: 'ambiguous-date';
 }
 
+export interface ParsedRecurrencePhrase {
+	recur: string;
+	due: string;
+	consumed: number;
+}
+
 // Strip diacritics so Spanish tokens compare the same with or without accents
 // ("miércoles" === "miercoles", "mañana" === "manana").
 export function deaccent(s: string): string {
@@ -116,6 +122,22 @@ export function parseDateToken(tok: string): string | undefined {
 		const normalized = `${numericDate[4]}-${month}-${day}`;
 		const m = moment(normalized, 'YYYY-MM-DD', true);
 		if (m.isValid()) return m.format('YYYY-MM-DD');
+	}
+
+	// A day/month without a year means its next occurrence. This keeps a date
+	// later this year in the current year and rolls an already-passed date over.
+	const partialNumericDate = /^(\d{1,2})([\/-])(\d{1,2})$/.exec(lower);
+	if (partialNumericDate) {
+		const day = partialNumericDate[1].padStart(2, '0');
+		const month = partialNumericDate[3].padStart(2, '0');
+		const today = moment().startOf('day');
+		// Eight years covers the largest gap between leap days in the Gregorian calendar.
+		for (let year = today.year(); year <= today.year() + 8; year++) {
+			const candidate = moment(`${year}-${month}-${day}`, 'YYYY-MM-DD', true);
+			if (candidate.isValid() && !candidate.isBefore(today, 'day')) {
+				return candidate.format('YYYY-MM-DD');
+			}
+		}
 	}
 
 	return undefined;
@@ -368,6 +390,79 @@ function relativeTokenFrom(tokens: string[], countIndex: number): { token: strin
 	return {
 		token: `+${parsedCount.count}${unit}`,
 		consumed: parsedCount.length + 1
+	};
+}
+
+const RECURRENCE_PREFIX_WORDS = new Set(['every', 'cada']);
+const RECURRENCE_UNITS: Record<string, { single: string, counted: string }> = {
+	day: { single: 'daily', counted: 'days' },
+	days: { single: 'daily', counted: 'days' },
+	dia: { single: 'daily', counted: 'days' },
+	dias: { single: 'daily', counted: 'days' },
+	week: { single: 'weekly', counted: 'weeks' },
+	weeks: { single: 'weekly', counted: 'weeks' },
+	semana: { single: 'weekly', counted: 'weeks' },
+	semanas: { single: 'weekly', counted: 'weeks' },
+	month: { single: 'monthly', counted: 'months' },
+	months: { single: 'monthly', counted: 'months' },
+	mes: { single: 'monthly', counted: 'months' },
+	meses: { single: 'monthly', counted: 'months' },
+	year: { single: 'yearly', counted: 'years' },
+	years: { single: 'yearly', counted: 'years' },
+	ano: { single: 'yearly', counted: 'years' },
+	anos: { single: 'yearly', counted: 'years' }
+};
+const STANDALONE_RECURRENCES: Record<string, string> = {
+	daily: 'daily',
+	diario: 'daily',
+	diaria: 'daily',
+	weekly: 'weekly',
+	semanal: 'weekly',
+	monthly: 'monthly',
+	mensual: 'monthly',
+	yearly: 'yearly',
+	annually: 'yearly',
+	annual: 'yearly',
+	anual: 'yearly'
+};
+
+// Parses one safe, contiguous recurrence phrase. Taskwarrior needs both a due
+// date and a recur period, so generic periods start today while named weekdays
+// start on their next occurrence.
+export function parseRecurrencePhrase(tokens: string[], index: number): ParsedRecurrencePhrase | undefined {
+	const first = deaccent(trimTokenPunctuation(tokens[index] ?? '').toLowerCase());
+	const standalone = STANDALONE_RECURRENCES[first];
+	if (standalone) {
+		return { recur: standalone, due: moment().format('YYYY-MM-DD'), consumed: 1 };
+	}
+	if (!RECURRENCE_PREFIX_WORDS.has(first)) return undefined;
+
+	const valueIndex = index + 1;
+	const value = deaccent(trimTokenPunctuation(tokens[valueIndex] ?? '').toLowerCase());
+	if (!value) return undefined;
+
+	if (value === 'weekday' || value === 'weekdays' || value === 'laborable' || value === 'laborables') {
+		const firstWeekday = moment().startOf('day');
+		if (firstWeekday.day() === 6) firstWeekday.add(2, 'days');
+		else if (firstWeekday.day() === 0) firstWeekday.add(1, 'day');
+		return { recur: 'weekdays', due: firstWeekday.format('YYYY-MM-DD'), consumed: 2 };
+	}
+
+	const unit = RECURRENCE_UNITS[value];
+	if (unit) return { recur: unit.single, due: moment().format('YYYY-MM-DD'), consumed: 2 };
+
+	const weekdayDue = dayIndexOf(value) !== -1 ? parseDateToken(value) : undefined;
+	if (weekdayDue) return { recur: 'weekly', due: weekdayDue, consumed: 2 };
+
+	const count = relativeCountFrom(tokens, valueIndex);
+	if (!count) return undefined;
+	const countedUnitToken = deaccent(trimTokenPunctuation(tokens[valueIndex + count.length] ?? '').toLowerCase());
+	const countedUnit = RECURRENCE_UNITS[countedUnitToken];
+	if (!countedUnit) return undefined;
+	return {
+		recur: count.count === 1 ? countedUnit.single : `${count.count}${countedUnit.counted}`,
+		due: moment().format('YYYY-MM-DD'),
+		consumed: 1 + count.length + 1
 	};
 }
 

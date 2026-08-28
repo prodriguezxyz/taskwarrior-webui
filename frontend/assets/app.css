@@ -1379,6 +1379,57 @@ button.tw-icon-btn:focus-visible {
    QUICK ADD (preview chips below the input)
    ============================================================ */
 
+.tw-quickadd__actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
+	overflow-x: auto;
+	border-bottom: 1px solid var(--tw-border);
+	background: var(--tw-bg);
+	scrollbar-width: none;
+}
+
+.tw-quickadd__actions::-webkit-scrollbar { display: none; }
+
+.tw-quickadd__action {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-height: 28px;
+	padding: 3px 8px;
+	border: 1px solid var(--tw-border);
+	border-radius: var(--tw-radius-sm);
+	background: transparent;
+	color: var(--tw-text-muted);
+	font-family: var(--tw-font);
+	font-size: 12px;
+	font-weight: 500;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.tw-quickadd__action:hover,
+.tw-quickadd__action--active {
+	background: var(--tw-surface-hover);
+	border-color: var(--tw-text-muted);
+	color: var(--tw-text);
+}
+
+.tw-quickadd__action:focus-visible {
+	outline: 2px solid var(--tw-accent);
+	outline-offset: 1px;
+}
+
+.tw-quickadd__action:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.tw-quickadd__action .v-icon { color: inherit !important; }
+
 .tw-quickadd__preview {
 	display: flex;
 	flex-wrap: wrap;
@@ -1460,6 +1511,7 @@ button.tw-icon-btn:focus-visible {
 }
 
 .tw-quickadd__chip {
+	appearance: none;
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -1474,6 +1526,18 @@ button.tw-icon-btn:focus-visible {
 }
 
 .tw-quickadd__chip .v-icon { color: var(--tw-text-faint) !important; }
+
+.tw-quickadd__chip--interactive { cursor: pointer; }
+
+.tw-quickadd__chip--interactive:hover {
+	border-color: var(--tw-text-muted);
+	color: var(--tw-text);
+}
+
+.tw-quickadd__chip--interactive:focus-visible {
+	outline: 2px solid var(--tw-accent);
+	outline-offset: 1px;
+}
 
 .tw-quickadd__chip--pH {
 	color: var(--tw-danger);
